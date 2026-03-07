@@ -268,6 +268,10 @@ const suggestions = [
 const announcements = [
   { id: 1, tag: '通知', title: '系统新版本升级通知，新功能介绍...', isRed: true, time: '10分钟前' },
   { id: 2, tag: '通知', title: '国庆节放假安排通知，请提前做好准备...', isRed: true, time: '1小时前' },
+  { id: 3, tag: '通知', title: '系统新版本升级通知，新功能介绍...', isRed: true, time: '今天 09:45' },
+  { id: 4, tag: '通知', title: '产品试用期即将到期，请尽快续费...', isRed: true, time: '昨天 18:20' },
+  { id: 5, tag: '通知', title: '国庆节团购活动通知，限时优惠开启...', isRed: true, time: '昨天 15:06' },
+  { id: 6, tag: '通知', title: '产品试用期即将到期，请尽快续费...', isRed: true, time: '10月01日' },
 ];
 
 const globalHistoryData = [
@@ -1292,7 +1296,10 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [homeViewKey, setHomeViewKey] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+
+  const visibleNotifications = showAllNotifications ? announcements : announcements.slice(0, 3);
 
   const goHome = () => {
     setCurrentView('home');
@@ -1373,15 +1380,33 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-             <div className="relative">
-              <div className="relative cursor-pointer p-1.5 rounded hover:bg-gray-100" onClick={() => setShowNotifications(!showNotifications)}>
+              <div className="relative">
+              <div
+                className="relative cursor-pointer p-1.5 rounded hover:bg-gray-100"
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  if (!showNotifications) {
+                    setShowAllNotifications(false);
+                  }
+                }}
+              >
                 <Bell size={20} className="text-gray-500" />
               </div>
               {showNotifications && (
                 <div className="absolute right-0 top-12 w-80 bg-white shadow-xl rounded-xl border border-gray-100 z-50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50"><h3 className="font-bold text-gray-800 text-sm">通知公告</h3></div>
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+                    <h3 className="font-bold text-gray-800 text-sm">公告</h3>
+                    {announcements.length > 3 && (
+                      <button
+                        onClick={() => setShowAllNotifications((prev) => !prev)}
+                        className="text-xs text-blue-500 hover:text-blue-600"
+                      >
+                        {showAllNotifications ? '收起' : '查看更多'}
+                      </button>
+                    )}
+                  </div>
                   <div className="max-h-[280px] overflow-y-auto">
-                    {announcements.map((item) => (
+                    {visibleNotifications.map((item) => (
                       <div key={item.id} className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50"><div className="flex justify-between items-start mb-1"><span className="text-[10px] px-1.5 py-0.5 rounded border text-red-500 border-red-200 bg-red-50">{item.tag}</span><span className="text-[10px] text-gray-400">{item.time}</span></div><p className="text-sm text-gray-700">{item.title}</p></div>
                     ))}
                   </div>
