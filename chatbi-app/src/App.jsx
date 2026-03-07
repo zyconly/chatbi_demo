@@ -81,6 +81,7 @@ import {
   Download,
   Code
 } from 'lucide-react';
+import ipMascot from './assets/img.png';
 
 // --- 样式注入 ---
 const styles = `
@@ -122,7 +123,7 @@ const menuStructure = [
     icon: Cpu,
     type: 'submenu',
     children: [
-      { id: 'bi-agent-manage', label: 'BI智能体管理', type: 'item', view: 'agents' },
+      { id: 'bi-agent-manage', label: 'BI智能体管理', type: 'item', view: 'agent-manage' },
       { id: 'workflow-manage', label: '工作流管理', type: 'item' }
     ]
   },
@@ -284,6 +285,17 @@ const agentHistoryData = [
   { title: '突发公关事件传播路径', date: '2026-02-05' },
 ];
 
+const agentManageData = [
+  { id: 1, name: 'test-001111', status: '已发布', desc: 'test-001', owner: '胡维达', update: '2026-02-09 17:44:04' },
+  { id: 2, name: 'test_176114505963', status: '未发布', desc: 'test', owner: '管理员', update: '2026-02-04 15:39:36' },
+  { id: 3, name: '第一个小程序智能体', status: '已发布', desc: '第一个小程序智能体', owner: '13770737933', update: '2026-01-23 10:27:14' },
+  { id: 4, name: '测试第二个小程序智能体', status: '已发布', desc: '第二个小程序智能体', owner: '13770737933', update: '2026-01-23 10:24:39' },
+  { id: 5, name: '测试给小程序用的智能体', status: '已发布', desc: '给小程序用的智能体', owner: '管理员', update: '2026-01-22 14:20:35' },
+  { id: 6, name: 'ffff-没有工作流', status: '已发布', desc: 'ffff', owner: '管理员', update: '2026-01-21 15:25:48' },
+  { id: 7, name: 'mm测试-没有探索分析', status: '未发布', desc: '我可以查询数据库的数据', owner: '管理员', update: '2026-01-21 15:24:36' },
+  { id: 8, name: 'huwd-009-探索分析', status: '已发布', desc: 'huwd-009', owner: '管理员', update: '2026-01-21 15:24:16' }
+];
+
 const datasetFields = {
   dimensions: [
     { id: 'd1', name: '省份', type: 'text' },
@@ -397,7 +409,7 @@ const RecursiveMenuItem = ({ item, depth = 0, isCollapsed, activeId, expandedIds
   );
 };
 
-const Sidebar = ({ isCollapsed, setIsCollapsed, currentView, setCurrentView }) => {
+const Sidebar = ({ isCollapsed, setIsCollapsed, currentView, setCurrentView, onGoHome }) => {
   const [expandedIds, setExpandedIds] = useState(['semantics', 'metric-manage-group']);
   const [activeId, setActiveId] = useState('home');
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -408,6 +420,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, currentView, setCurrentView }) =
 
   const handleSelect = (id, view) => {
     setActiveId(id);
+    if (view === 'home') {
+      onGoHome();
+      return;
+    }
     if (view) setCurrentView(view);
   };
 
@@ -776,6 +792,89 @@ const AgentsView = ({ onNavigate }) => (
   </div>
 );
 
+const AgentManageView = () => {
+  const [statusFilter, setStatusFilter] = useState('全部');
+  const [searchText, setSearchText] = useState('');
+  const [menuOpenId, setMenuOpenId] = useState(null);
+
+  const filtered = agentManageData.filter((item) => {
+    const statusMatched = statusFilter === '全部' || item.status === statusFilter;
+    const keywordMatched = !searchText.trim() || item.name.includes(searchText) || item.desc.includes(searchText);
+    return statusMatched && keywordMatched;
+  });
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-gradient-to-br from-[#d8e4ff] to-[#eef2fb] p-5">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-3xl font-bold text-gray-800">智能体管理</h2>
+        <button className="bg-blue-500 hover:bg-blue-600 text-white px-5 h-10 rounded-xl text-sm font-medium flex items-center gap-2 shadow-sm">
+          <Plus size={16} /> 创建智能体
+        </button>
+      </div>
+
+      <div className="flex items-center justify-end gap-4 mb-6">
+        <div className="bg-[#d3dcea] rounded-xl p-1 flex items-center">
+          {['全部', '已发布', '未发布'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setStatusFilter(tab)}
+              className={`px-4 h-9 rounded-lg text-sm ${statusFilter === tab ? 'bg-white text-gray-800 font-medium shadow-sm' : 'text-gray-600'}`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="请输入关键词搜索"
+            className="w-72 h-10 bg-white/90 border border-gray-300 rounded-xl pl-9 pr-3 text-sm focus:outline-none focus:border-blue-400"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 md:grid-cols-2 gap-4">
+        {filtered.map((item) => (
+          <div key={item.id} className="bg-white/95 rounded-2xl border border-gray-200 shadow-sm p-4 relative">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-3">
+                <img src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${item.id}`} alt="avatar" className="w-12 h-12 rounded-xl bg-blue-100" />
+                <div>
+                  <div className="text-3xl leading-none text-gray-800 font-bold mb-1">{item.name}</div>
+                  <div className="flex items-center gap-1 text-sm">
+                    <span className={`w-2.5 h-2.5 rounded-full ${item.status === '已发布' ? 'bg-emerald-500' : 'bg-gray-300'}`}></span>
+                    <span className={`${item.status === '已发布' ? 'text-emerald-600' : 'text-gray-500'} font-medium`}>{item.status}</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)} className="text-gray-400 hover:text-gray-600">
+                <MoreHorizontal size={18} />
+              </button>
+            </div>
+            <div className="text-gray-500 text-sm mt-4 min-h-[22px]">{item.desc}</div>
+            <div className="h-px bg-gray-200 my-5"></div>
+            <div className="flex items-center justify-between text-sm text-gray-500">
+              <span>{item.owner}</span>
+              <span>最近编辑：{item.update}</span>
+            </div>
+
+            {menuOpenId === item.id && (
+              <div className="absolute right-4 top-14 bg-white rounded-xl border border-gray-200 shadow-xl w-28 py-2 z-20">
+                {['发布', '赋权', '修改', '复制'].map((action) => (
+                  <button key={action} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">{action}</button>
+                ))}
+                <button className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50">删除</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // --- HomeView：集成多轮对话流引擎 ---
 const HomeView = ({ onNavigate }) => {
   const [inputText, setInputText] = useState('');
@@ -786,14 +885,29 @@ const HomeView = ({ onNavigate }) => {
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [showDatasetModal, setShowDatasetModal] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState(null);
+  const [selectedModel, setSelectedModel] = useState('Qwen3-30B-A3B');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
+  const modelDropdownRef = useRef(null);
+
+  const modelOptions = ['qwen3-max', 'qwen3-32b', 'Qwen3-30B-A3B', 'qwen3-coder-plus', 'deepseek-v3.2', 'qwen2-72b-instruct'];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(event.target)) {
+        setShowModelDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSuggestionClick = (item) => {
     setActiveFiles(item.files);
@@ -1066,13 +1180,47 @@ const HomeView = ({ onNavigate }) => {
       {showDatasetModal && <DatasetSelectionModal onClose={() => setShowDatasetModal(false)} onConfirm={handleDatasetConfirm} />}
 
       <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar relative h-full">
-        <div className="max-w-5xl w-full mx-auto px-6 flex flex-col items-center relative z-10 pb-20 pt-16">
+        {!isChatting && (
+          <div ref={modelDropdownRef} className="absolute top-[30px] left-[30px] z-30">
+            <button
+              onClick={() => setShowModelDropdown(prev => !prev)}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-2 min-w-[200px] h-[42px] flex items-center justify-between text-xs font-medium text-gray-700 shadow-sm hover:border-blue-300 transition-colors"
+            >
+              <span>{selectedModel}</span>
+              <ChevronDown size={16} className={`text-gray-500 transition-transform ${showModelDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showModelDropdown && (
+              <div className="absolute left-0 top-[calc(100%+8px)] w-[220px] max-h-[260px] overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl py-2">
+                {modelOptions.map((model) => (
+                  <button
+                    key={model}
+                    onClick={() => { setSelectedModel(model); setShowModelDropdown(false); }}
+                    className={`w-full text-left px-4 py-2 text-xs transition-colors ${selectedModel === model ? 'bg-blue-50 text-gray-800 font-medium' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    {model}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={`max-w-5xl w-full mx-auto px-6 flex flex-col items-center relative z-10 ${isChatting ? 'pb-20 pt-16' : 'min-h-full justify-center py-10'}`}>
 
           {!isChatting ? (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-500">
-              <div className="mb-6 text-center mt-12">
-                <h1 className="text-4xl font-bold text-gray-800 mb-3 px-4 py-1">ChatBI，<span className="text-purple-600">您的AI决策助手</span></h1>
-                <p className="text-gray-500 text-sm">AI 为您全网找数据，生成职场级、可交付的数据报告！</p>
+              <div className="mb-8 mt-4 w-full max-w-5xl">
+                <div className="flex flex-col md:flex-row items-center justify-center gap-5 md:gap-8 px-4">
+                  <img
+                    src={ipMascot}
+                    alt="ChatBI IP"
+                    className="w-28 h-28 md:w-36 md:h-36 object-cover rounded-2xl shadow-sm flex-shrink-0"
+                  />
+                  <div className="text-center">
+                    <h1 className="text-4xl font-bold text-gray-800 mb-3">ChatBI，<span className="text-purple-600">您的AI决策助手</span></h1>
+                    <p className="text-gray-500 text-base">AI 为您全网找数据，生成职场级、可交付的数据报告！</p>
+                  </div>
+                </div>
               </div>
 
               {/* 顶部悬浮功能按钮 */}
@@ -1142,15 +1290,30 @@ export default function App() {
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [currentView, setCurrentView] = useState('home');
+  const [homeViewKey, setHomeViewKey] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+
+  const goHome = () => {
+    setCurrentView('home');
+    setHomeViewKey(prev => prev + 1);
+  };
 
   const isAgentView = currentView === 'chat-agent-1';
   const historyData = isAgentView ? agentHistoryData : globalHistoryData;
   const historyTitle = isAgentView ? '舆情助手历史' : '历史对话';
 
+  const breadcrumbMap = {
+    home: '首页 > 智能问数',
+    'agent-manage': '首页 > BI智能体 > 智能体管理',
+    agents: '首页 > 智能体广场',
+    'chat-agent-1': '首页 > 舆情分析助手',
+    'smart-builder': '首页 > 智能看板'
+  };
+  const breadcrumbText = breadcrumbMap[currentView] || '首页';
+
   if (currentView === 'smart-builder') {
-    return <SmartBuilderView onBack={() => setCurrentView('home')} />;
+    return <SmartBuilderView onBack={goHome} />;
   }
 
   return (
@@ -1171,11 +1334,11 @@ export default function App() {
         </div>
       )}
 
-      <Sidebar isCollapsed={isNavCollapsed} setIsCollapsed={setIsNavCollapsed} currentView={currentView} setCurrentView={setCurrentView} />
+      <Sidebar isCollapsed={isNavCollapsed} setIsCollapsed={setIsNavCollapsed} currentView={currentView} setCurrentView={setCurrentView} onGoHome={goHome} />
 
       <div className={`bg-white border-r border-gray-200 flex flex-col flex-shrink-0 z-10 hidden md:flex transition-all duration-300 ${isChatCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'}`}>
         <div className="p-4 min-w-[18rem]">
-          <button onClick={() => setCurrentView('home')} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium mb-6 group"><Plus size={18} /> 新建对话</button>
+          <button onClick={goHome} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium mb-6 group"><Plus size={18} /> 新建对话</button>
           <div className="space-y-2 mb-6">
              <div onClick={() => setCurrentView('chat-agent-1')} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${currentView === 'chat-agent-1' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-transparent'}`}>
                <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center text-blue-500"><User size={14} /></div><span className="text-sm text-gray-700">舆情分析助手</span></div>
@@ -1206,7 +1369,7 @@ export default function App() {
         <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-50 flex-shrink-0">
           <div className="flex items-center gap-4 pl-4">
             <div className="hidden md:flex items-center text-sm text-gray-500">
-              {currentView === 'home' ? <span className="text-gray-800 font-medium">首页</span> : <><span onClick={() => setCurrentView('home')} className="hover:text-blue-600 cursor-pointer">工作台</span><ChevronRight size={14} className="mx-1" /><span className="text-gray-800 font-medium">{currentView === 'agents' ? '智能体广场' : '舆情分析助手'}</span></>}
+              <span className="text-gray-800 font-medium">{breadcrumbText}</span>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -1229,9 +1392,10 @@ export default function App() {
             <button onClick={() => setShowQrCodeModal(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><QrCode size={16} /><span className="hidden sm:inline">小程序体验</span></button>
           </div>
         </div>
-        {currentView === 'home' && <HomeView onNavigate={setCurrentView} />}
+        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} />}
+        {currentView === 'agent-manage' && <AgentManageView />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
-        {currentView === 'chat-agent-1' && <ChatAgentView onBack={() => setCurrentView('home')} />}
+        {currentView === 'chat-agent-1' && <ChatAgentView onBack={goHome} />}
       </div>
     </div>
   );
