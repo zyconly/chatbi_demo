@@ -1,0 +1,1019 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上海产业园区春节前后人流数据分析报告</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span class="brand-icon">📊</span>
+                <span class="brand-text">数据分析报告</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#overview" class="nav-link active">总览</a></li>
+                <li><a href="#population" class="nav-link">人群画像</a></li>
+                <li><a href="#trends" class="nav-link">人流趋势</a></li>
+                <li><a href="#comparison" class="nav-link">区域对比</a></li>
+
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 头部横幅 -->
+    <header class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">上海产业园区春节前后人流数据分析报告</h1>
+            <p class="hero-subtitle">基于工业、科技、金融三类园区的综合分析</p>
+            <div class="hero-meta">
+                <span class="meta-item">📅 报告周期：春节前后31天</span>
+                <span class="meta-item">🏢 覆盖园区：工业、科技、金融</span>
+                <span class="meta-item">📍 区域范围：上海全市</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容 -->
+    <main class="main-content">
+        <!-- 一、整体分析总览 -->
+        <section id="overview" class="section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-number">01</span>
+                    整体分析总览
+                </h2>
+                <p class="section-desc">三个阶段的人流量变化趋势与复工情况总览</p>
+            </div>
+
+            <!-- 核心洞察 -->
+            <div class="section-summary">
+                <div class="summary-icon">💡</div>
+                <div class="summary-content">
+                    <h4>核心洞察</h4>
+                    <p>整体数据显示，2024年春节前后上海产业园区人流呈现"V型"复苏态势。节前返乡率较去年下降5.2个百分点，反映出更多人员选择就地过年或缩短返乡周期。节后复工率达到87.6%，高于去年同期水平，显示出园区经济活力的快速恢复。科技园区新增人员比例最高（8.2%），表明科技创新产业持续吸引人才流入。三类园区中，金融园区留守意愿最强，工业园区返乡最早，呈现出明显的行业特征差异。</p>
+                </div>
+            </div>
+
+            <!-- 关键指标卡片 -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-icon">👥</div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-label">日均人流量</h3>
+                        <div class="kpi-value">128,450</div>
+                        <div class="kpi-trend trend-up">
+                            <span class="trend-icon">↑</span>
+                            <span>较去年增长 12.5%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon">📈</div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-label">峰值人流量</h3>
+                        <div class="kpi-value">185,320</div>
+                        <div class="kpi-trend trend-up">
+                            <span class="trend-icon">↑</span>
+                            <span>节后复工首日</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon">✅</div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-label">整体复工率</h3>
+                        <div class="kpi-value">87.6%</div>
+                        <div class="kpi-trend trend-up">
+                            <span class="trend-icon">↑</span>
+                            <span>节后8天累计</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-card">
+                    <div class="kpi-icon">🏠</div>
+                    <div class="kpi-content">
+                        <h3 class="kpi-label">节前返乡率</h3>
+                        <div class="kpi-value">42.3%</div>
+                        <div class="kpi-trend trend-down">
+                            <span class="trend-icon">↓</span>
+                            <span>较去年下降 5.2%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 人流量趋势图 -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3 class="chart-title">三阶段人流量变化趋势</h3>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span>工业园区</span>
+                        <span class="legend-item"><span class="legend-color" style="background: #10b981;"></span>科技园区</span>
+                        <span class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span>金融园区</span>
+                    </div>
+                </div>
+                <div class="chart-body">
+                    <canvas id="overviewChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 人员流动特征 -->
+            <div class="recovery-stats-grid">
+                <div class="recovery-stat-card" data-type="departure">
+                    <div class="recovery-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                    </div>
+                    <div class="recovery-card-content">
+                        <span class="recovery-card-label">节前返乡率</span>
+                        <div class="recovery-card-value">42.3%</div>
+                        <div class="recovery-card-trend neutral">
+                            <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>除夕前14天累计返乡人员占比</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recovery-stat-card" data-type="stay">
+                    <div class="recovery-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <div class="recovery-card-content">
+                        <span class="recovery-card-label">节中留守率</span>
+                        <div class="recovery-card-value">15.8%</div>
+                        <div class="recovery-card-trend neutral">
+                            <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>春节期间园区值班人员占比</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recovery-stat-card" data-type="new">
+                    <div class="recovery-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                    </div>
+                    <div class="recovery-card-content">
+                        <span class="recovery-card-label">节后新增人员</span>
+                        <div class="recovery-card-value">8.2%</div>
+                        <div class="recovery-card-trend neutral">
+                            <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>新入职人员占总人数比例</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 二、人群画像专项分析 -->
+        <section id="population" class="section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-number">02</span>
+                    人群画像专项分析
+                </h2>
+                <p class="section-desc">基本属性、地域特征与通勤特征分析</p>
+            </div>
+
+            <!-- 核心洞察 -->
+            <div class="section-summary">
+                <div class="summary-icon">💡</div>
+                <div class="summary-content">
+                    <h4>核心洞察</h4>
+                    <p>人群画像分析揭示了三类园区的显著差异：工业园区男性占比最高（65%），年龄结构偏成熟，主要来自安徽、江苏等周边省份，通勤距离最短（12.5km）；科技园区性别比例相对均衡（男58%），以25-35岁青年群体为主，地域来源更加多元化，通勤距离居中（15.8km）；金融园区性别最为均衡（男52%），年龄跨度大，居住地集中在浦东、徐汇等核心区域，通勤距离最长（18.2km）。三类园区的人员特征与其产业定位高度契合，为精准化园区服务提供了数据支撑。</p>
+                </div>
+            </div>
+
+            <!-- 基本属性分析 -->
+            <div class="subsection">
+                <h3 class="subsection-title">基本属性分析</h3>
+                
+                <div class="analysis-grid">
+                    <!-- 性别分布 -->
+                    <div class="analysis-card">
+                        <h4 class="card-title">性别分布</h4>
+                        <div class="gender-chart">
+                            <div class="gender-item">
+                                <div class="gender-label">工业园区</div>
+                                <div class="gender-bar-container">
+                                    <div class="gender-bar male" style="width: 65%;">
+                                        <span>男 65%</span>
+                                    </div>
+                                    <div class="gender-bar female" style="width: 35%;">
+                                        <span>女 35%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="gender-item">
+                                <div class="gender-label">科技园区</div>
+                                <div class="gender-bar-container">
+                                    <div class="gender-bar male" style="width: 58%;">
+                                        <span>男 58%</span>
+                                    </div>
+                                    <div class="gender-bar female" style="width: 42%;">
+                                        <span>女 42%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="gender-item">
+                                <div class="gender-label">金融园区</div>
+                                <div class="gender-bar-container">
+                                    <div class="gender-bar male" style="width: 52%;">
+                                        <span>男 52%</span>
+                                    </div>
+                                    <div class="gender-bar female" style="width: 48%;">
+                                        <span>女 48%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 年龄结构 -->
+                    <div class="analysis-card">
+                        <h4 class="card-title">年龄结构</h4>
+                        <div class="chart-body">
+                            <canvas id="ageChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 地域特征分析 -->
+            <div class="subsection">
+                <h3 class="subsection-title">地域特征分析</h3>
+                
+                <div class="analysis-grid">
+                    <!-- 来源地分布 -->
+                    <div class="analysis-card">
+                        <h4 class="card-title">来源地分布 TOP5</h4>
+                        <div class="region-list">
+                            <div class="region-item">
+                                <div class="region-rank">1</div>
+                                <div class="region-name">安徽省</div>
+                                <div class="region-bar-container">
+                                    <div class="region-bar" style="width: 85%;"></div>
+                                </div>
+                                <div class="region-value">28.5%</div>
+                            </div>
+                            <div class="region-item">
+                                <div class="region-rank">2</div>
+                                <div class="region-name">江苏省</div>
+                                <div class="region-bar-container">
+                                    <div class="region-bar" style="width: 72%;"></div>
+                                </div>
+                                <div class="region-value">24.2%</div>
+                            </div>
+                            <div class="region-item">
+                                <div class="region-rank">3</div>
+                                <div class="region-name">河南省</div>
+                                <div class="region-bar-container">
+                                    <div class="region-bar" style="width: 58%;"></div>
+                                </div>
+                                <div class="region-value">19.6%</div>
+                            </div>
+                            <div class="region-item">
+                                <div class="region-rank">4</div>
+                                <div class="region-name">四川省</div>
+                                <div class="region-bar-container">
+                                    <div class="region-bar" style="width: 45%;"></div>
+                                </div>
+                                <div class="region-value">15.1%</div>
+                            </div>
+                            <div class="region-item">
+                                <div class="region-rank">5</div>
+                                <div class="region-name">湖北省</div>
+                                <div class="region-bar-container">
+                                    <div class="region-bar" style="width: 38%;"></div>
+                                </div>
+                                <div class="region-value">12.6%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 居住地分布 -->
+                    <div class="analysis-card">
+                        <h4 class="card-title">居住地分布（上海行政区）</h4>
+                        <div class="chart-body">
+                            <canvas id="residenceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通勤特征分析 -->
+            <div class="subsection">
+                <h3 class="subsection-title">通勤特征分析</h3>
+                
+                <div class="commute-grid">
+                    <div class="commute-card">
+                        <div class="commute-icon">⏱️</div>
+                        <h4>通勤时长分布</h4>
+                        <div class="commute-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">0-30分钟</span>
+                                <span class="stat-value">32%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">30分钟-1小时</span>
+                                <span class="stat-value">45%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">1小时以上</span>
+                                <span class="stat-value">23%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="commute-card">
+                        <div class="commute-icon">🛣️</div>
+                        <h4>平均通勤距离</h4>
+                        <div class="commute-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">工业园区</span>
+                                <span class="stat-value">12.5 km</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">科技园区</span>
+                                <span class="stat-value">15.8 km</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">金融园区</span>
+                                <span class="stat-value">18.2 km</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 三、人流趋势专项分析 -->
+        <section id="trends" class="section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-number">03</span>
+                    人流趋势专项分析
+                </h2>
+                <p class="section-desc">节前、节中、节后三个阶段的人流变化趋势</p>
+            </div>
+
+            <!-- 核心洞察 -->
+            <div class="section-summary">
+                <div class="summary-icon">💡</div>
+                <div class="summary-content">
+                    <h4>核心洞察</h4>
+                    <p>人流趋势分析显示，节前返乡呈现"双峰"特征：除夕前7天出现首个返乡小高峰（返乡率18.5%），除夕前3天达到最高峰（返乡率32.7%）。工业园区返乡最早，除夕前10天即开始大规模返乡；科技园区返乡最晚，集中在除夕前5天。节中留守人员以安保、运维等关键岗位为主，金融园区留守比例最高（18.2%），反映出金融行业春节期间的持续运营需求。节后复工呈现"快速回升"态势，初八复工率达到61.3%，正月十五恢复至87.6%，其中科技园区复工速度最快，显示出科技创新产业强劲活力。</p>
+                </div>
+            </div>
+
+            <!-- 节前返乡趋势 -->
+            <div class="subsection">
+                <h3 class="subsection-title">节前返乡趋势（除夕前14天）</h3>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4 class="chart-title">每日返乡人数变化</h4>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span>工业园区</span>
+                            <span class="legend-item"><span class="legend-color" style="background: #10b981;"></span>科技园区</span>
+                            <span class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span>金融园区</span>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="departureChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="insight-grid-premium">
+                    <div class="insight-card-premium" data-type="peak">
+                        <div class="insight-card-bg"></div>
+                        <div class="insight-card-glow"></div>
+                        <div class="insight-icon-wrapper">
+                            <svg class="insight-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                                <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"></path>
+                            </svg>
+                        </div>
+                        <div class="insight-content-premium">
+                            <span class="insight-label-premium">返乡高峰日</span>
+                            <h4 class="insight-value-premium">除夕前3天</h4>
+                            <div class="insight-metric">
+                                <span class="metric-dot"></span>
+                                <span>单日返乡人数达32.7%</span>
+                            </div>
+                        </div>
+                        <div class="insight-badge">PEAK</div>
+                    </div>
+                    <div class="insight-card-premium" data-type="early">
+                        <div class="insight-card-bg"></div>
+                        <div class="insight-card-glow"></div>
+                        <div class="insight-icon-wrapper">
+                            <svg class="insight-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
+                                <path d="M17 18h1M12 18h1M7 18h1"></path>
+                            </svg>
+                        </div>
+                        <div class="insight-content-premium">
+                            <span class="insight-label-premium">最早返乡园区</span>
+                            <h4 class="insight-value-premium">工业园区</h4>
+                            <div class="insight-metric">
+                                <span class="metric-dot"></span>
+                                <span>除夕前10天开始大规模返乡</span>
+                            </div>
+                        </div>
+                        <div class="insight-badge early">EARLY</div>
+                    </div>
+                    <div class="insight-card-premium" data-type="late">
+                        <div class="insight-card-bg"></div>
+                        <div class="insight-card-glow"></div>
+                        <div class="insight-icon-wrapper">
+                            <svg class="insight-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                <path d="M2 17l10 5 10-5"></path>
+                                <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                        </div>
+                        <div class="insight-content-premium">
+                            <span class="insight-label-premium">最晚返乡园区</span>
+                            <h4 class="insight-value-premium">科技园区</h4>
+                            <div class="insight-metric">
+                                <span class="metric-dot"></span>
+                                <span>集中在除夕前5天返乡</span>
+                            </div>
+                        </div>
+                        <div class="insight-badge late">LATE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 节中留守趋势 -->
+            <div class="subsection">
+                <h3 class="subsection-title">节中留守趋势（除夕至初七）</h3>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4 class="chart-title">每日留守人数变化</h4>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="stayChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="premium-table-container">
+                    <div class="premium-table-header">
+                        <div class="table-header-item">园区类型</div>
+                        <div class="table-header-item">留守人数</div>
+                        <div class="table-header-item">留守比例</div>
+                    </div>
+                    <div class="premium-table-body">
+                        <div class="premium-table-row" data-type="industrial">
+                            <div class="table-cell-type">
+                                <div class="type-icon industrial">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
+                                    </svg>
+                                </div>
+                                <span class="type-name">工业园区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">2,450</span>
+                                <span class="number-unit">人</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar industrial" style="width: 12.3%;"></div>
+                                </div>
+                                <span class="progress-value">12.3%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row" data-type="tech">
+                            <div class="table-cell-type">
+                                <div class="type-icon tech">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                        <path d="M2 17l10 5 10-5"></path>
+                                        <path d="M2 12l10 5 10-5"></path>
+                                    </svg>
+                                </div>
+                                <span class="type-name">科技园区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">1,820</span>
+                                <span class="number-unit">人</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar tech" style="width: 14.5%;"></div>
+                                </div>
+                                <span class="progress-value">14.5%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row" data-type="finance">
+                            <div class="table-cell-type">
+                                <div class="type-icon finance">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                    </svg>
+                                </div>
+                                <span class="type-name">金融园区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">980</span>
+                                <span class="number-unit">人</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar finance" style="width: 18.2%;"></div>
+                                </div>
+                                <span class="progress-value">18.2%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 节后复工趋势 -->
+            <div class="subsection">
+                <h3 class="subsection-title">节后复工趋势（初八至十五）</h3>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4 class="chart-title">每日复工率变化</h4>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span>工业园区</span>
+                            <span class="legend-item"><span class="legend-color" style="background: #10b981;"></span>科技园区</span>
+                            <span class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span>金融园区</span>
+                        </div>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="returnChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="recovery-stats-grid">
+                    <div class="recovery-stat-card" data-type="early">
+                        <div class="recovery-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 17l5-5-5-5M6 17l5-5-5-5"></path>
+                            </svg>
+                        </div>
+                        <div class="recovery-card-content">
+                            <span class="recovery-card-label">初八复工率</span>
+                            <div class="recovery-card-value">61.3%</div>
+                            <div class="recovery-card-trend">
+                                <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M7 17l5-5 5 5M7 12l5-5 5 5"></path>
+                                </svg>
+                                <span>较去年提高 8.2%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recovery-stat-card" data-type="final">
+                        <div class="recovery-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                        <div class="recovery-card-content">
+                            <span class="recovery-card-label">正月十五复工率</span>
+                            <div class="recovery-card-value">87.6%</div>
+                            <div class="recovery-card-trend">
+                                <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M7 17l5-5 5 5M7 12l5-5 5 5"></path>
+                                </svg>
+                                <span>较去年提高 5.4%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recovery-stat-card" data-type="fastest">
+                        <div class="recovery-card-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                            </svg>
+                        </div>
+                        <div class="recovery-card-content">
+                            <span class="recovery-card-label">最快复工园区</span>
+                            <div class="recovery-card-value text">科技园区</div>
+                            <div class="recovery-card-trend">
+                                <svg class="trend-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M7 17l5-5 5 5M7 12l5-5 5 5"></path>
+                                </svg>
+                                <span>初八复工率达68.5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 四、区域对比分析 -->
+        <section id="comparison" class="section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <span class="section-number">04</span>
+                    区域对比分析
+                </h2>
+                <p class="section-desc">行政区维度与园区类型维度的对比分析</p>
+            </div>
+
+            <!-- 核心洞察 -->
+            <div class="section-summary">
+                <div class="summary-icon">💡</div>
+                <div class="summary-content">
+                    <h4>核心洞察</h4>
+                    <p>区域对比分析揭示了不同行政区和园区类型的显著差异。浦东新区作为核心区域，人流量最大、复工率最高（89.2%），显示出强劲的经济活力；奉贤区工业园区集中，返乡率最高（48.5%），复工速度相对较慢；崇明区受地理位置影响，人流规模最小但留守比例较高。三类园区对比中，科技园区在新增人员比例（8.2%）、复工速度（初八68.5%）方面表现突出，反映出科技创新产业吸引力；工业园区返乡率最高（45.8%），但复工稳定性最好；金融园区留守比例最高（18.2%），体现了金融服务的持续性需求。</p>
+                </div>
+            </div>
+
+            <!-- 行政区维度对比 -->
+            <div class="subsection">
+                <h3 class="subsection-title">行政区维度对比</h3>
+                
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h4 class="chart-title">重点行政区人流趋势对比</h4>
+                    </div>
+                    <div class="chart-body">
+                        <canvas id="districtChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="premium-table-container">
+                    <div class="premium-table-header five-cols">
+                        <div class="table-header-item">行政区</div>
+                        <div class="table-header-item">日均人流量</div>
+                        <div class="table-header-item">返乡率</div>
+                        <div class="table-header-item">留守率</div>
+                        <div class="table-header-item">复工率</div>
+                    </div>
+                    <div class="premium-table-body">
+                        <div class="premium-table-row compact" data-type="pudong">
+                            <div class="table-cell-type">
+                                <div class="type-icon pudong">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </div>
+                                <span class="type-name">浦东新区</span>
+                                <span class="type-badge hot">核心</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">58,420</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar departure" style="width: 38.5%;"></div>
+                                </div>
+                                <span class="progress-value">38.5%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar stay" style="width: 16.8%;"></div>
+                                </div>
+                                <span class="progress-value">16.8%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar recovery" style="width: 89.2%;"></div>
+                                </div>
+                                <span class="progress-value highlight">89.2%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row compact" data-type="fengxian">
+                            <div class="table-cell-type">
+                                <div class="type-icon fengxian">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </div>
+                                <span class="type-name">奉贤区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">32,150</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar departure high" style="width: 48.5%;"></div>
+                                </div>
+                                <span class="progress-value">48.5%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar stay" style="width: 12.3%;"></div>
+                                </div>
+                                <span class="progress-value">12.3%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar recovery" style="width: 82.5%;"></div>
+                                </div>
+                                <span class="progress-value">82.5%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row compact" data-type="chongming">
+                            <div class="table-cell-type">
+                                <div class="type-icon chongming">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </div>
+                                <span class="type-name">崇明区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">8,650</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar departure" style="width: 42.8%;"></div>
+                                </div>
+                                <span class="progress-value">42.8%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar stay high" style="width: 18.5%;"></div>
+                                </div>
+                                <span class="progress-value">18.5%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar recovery" style="width: 85.3%;"></div>
+                                </div>
+                                <span class="progress-value">85.3%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row compact" data-type="xuhui">
+                            <div class="table-cell-type">
+                                <div class="type-icon xuhui">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </div>
+                                <span class="type-name">徐汇区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">18,230</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar departure low" style="width: 35.2%;"></div>
+                                </div>
+                                <span class="progress-value">35.2%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar stay" style="width: 17.2%;"></div>
+                                </div>
+                                <span class="progress-value">17.2%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar recovery" style="width: 88.6%;"></div>
+                                </div>
+                                <span class="progress-value highlight">88.6%</span>
+                            </div>
+                        </div>
+                        <div class="premium-table-row compact" data-type="minhang">
+                            <div class="table-cell-type">
+                                <div class="type-icon minhang">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                        <circle cx="12" cy="10" r="3"></circle>
+                                    </svg>
+                                </div>
+                                <span class="type-name">闵行区</span>
+                            </div>
+                            <div class="table-cell-number">
+                                <span class="number-value">11,000</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar departure" style="width: 44.5%;"></div>
+                                </div>
+                                <span class="progress-value">44.5%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar stay" style="width: 14.8%;"></div>
+                                </div>
+                                <span class="progress-value">14.8%</span>
+                            </div>
+                            <div class="table-cell-progress">
+                                <div class="progress-wrapper">
+                                    <div class="progress-bar recovery" style="width: 86.2%;"></div>
+                                </div>
+                                <span class="progress-value">86.2%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 园区类型维度对比 -->
+            <div class="subsection">
+                <h3 class="subsection-title">园区类型维度对比</h3>
+                
+                <div class="comparison-grid-v2">
+                    <div class="comparison-card-v2" data-type="industrial">
+                        <div class="card-header-v2">
+                            <div class="card-icon-v2 industrial">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"></path>
+                                </svg>
+                            </div>
+                            <h4 class="card-title-v2">工业园区</h4>
+                        </div>
+                        
+                        <div class="card-stats-v2">
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">日均人流量</span>
+                                <span class="stat-value-v2">52,300</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">返乡率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 departure" style="width: 45.8%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">45.8%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">留守率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 stay" style="width: 12.3%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">12.3%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">复工率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 recovery" style="width: 85.2%;"></div>
+                                </div>
+                                <span class="stat-percent-v2 highlight">85.2%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">新增人员</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 new" style="width: 6.5%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">6.5%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-desc-v2">
+                            工业园区返乡率最高，但复工稳定性最好，显示出工业生产的持续性需求。
+                        </div>
+                    </div>
+
+                    <div class="comparison-card-v2" data-type="tech">
+                        <div class="card-header-v2">
+                            <div class="card-icon-v2 tech">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5"></path>
+                                    <path d="M2 12l10 5 10-5"></path>
+                                </svg>
+                            </div>
+                            <h4 class="card-title-v2">科技园区</h4>
+                        </div>
+                        
+                        <div class="card-stats-v2">
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">日均人流量</span>
+                                <span class="stat-value-v2">48,650</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">返乡率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 departure" style="width: 38.2%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">38.2%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">留守率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 stay" style="width: 14.5%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">14.5%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">复工率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 recovery" style="width: 90.5%;"></div>
+                                </div>
+                                <span class="stat-percent-v2 highlight">90.5%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">新增人员</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 new" style="width: 8.2%;"></div>
+                                </div>
+                                <span class="stat-percent-v2 highlight">8.2%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-desc-v2">
+                            科技园区新增人员比例最高，复工速度最快，反映出科技创新产业强劲吸引力。
+                        </div>
+                    </div>
+
+                    <div class="comparison-card-v2" data-type="finance">
+                        <div class="card-header-v2">
+                            <div class="card-icon-v2 finance">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            <h4 class="card-title-v2">金融园区</h4>
+                        </div>
+                        
+                        <div class="card-stats-v2">
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">日均人流量</span>
+                                <span class="stat-value-v2">27,500</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">返乡率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 departure" style="width: 35.5%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">35.5%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">留守率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 stay" style="width: 18.2%;"></div>
+                                </div>
+                                <span class="stat-percent-v2 highlight">18.2%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">复工率</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 recovery" style="width: 88.6%;"></div>
+                                </div>
+                                <span class="stat-percent-v2 highlight">88.6%</span>
+                            </div>
+                            <div class="stat-item-v2">
+                                <span class="stat-label-v2">新增人员</span>
+                                <div class="stat-bar-container-v2">
+                                    <div class="stat-bar-v2 new" style="width: 7.8%;"></div>
+                                </div>
+                                <span class="stat-percent-v2">7.8%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="card-desc-v2">
+                            金融园区留守比例最高，展现了金融服务的持续性需求和行业特殊性。
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">© 2024 上海产业园区春节前后人流数据分析报告</p>
+            <p class="footer-text">数据来源：园区人脸识别系统 | 分析周期：2024年春节前后31天</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
