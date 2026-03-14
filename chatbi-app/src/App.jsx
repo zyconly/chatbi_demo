@@ -79,8 +79,15 @@ import {
   List,
   Type as TextIcon,
   Download,
-  Code
+  Code,
+  Copy,
+  Check,
+  StarOff,
+  Pencil,
+  Eye
 } from 'lucide-react';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import ipMascot from './assets/img.png';
 
 // --- 样式注入 ---
@@ -114,6 +121,312 @@ const styles = `
   }
 `;
 
+const TEMPLATE_CSS_RAW = `
+/* 全局样式重置 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* 主色调 */
+    --primary-color: #2563eb;
+    --primary-dark: #1e40af;
+    --primary-light: #3b82f6;
+    
+    /* 辅助色 */
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --danger-color: #ef4444;
+    
+    /* 中性色 */
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --text-light: #9ca3af;
+    --border-color: #e5e7eb;
+    --bg-light: #f9fafb;
+    --bg-white: #ffffff;
+    
+    /* 商务背景色 */
+    --business-bg-primary: #f8f9fb;
+    --business-bg-secondary: #eef1f5;
+    --business-bg-accent: #e8ecf2;
+    
+    /* 阴影 */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    
+    /* 圆角 */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    
+    /* 过渡 */
+    --transition: all 0.3s ease;
+    
+    /* A4 纸张尺寸 */
+    --a4-width: 210mm;
+    --a4-padding: 15mm;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: linear-gradient(135deg, 
+        #dfe6ed 0%, 
+        #c8d4e0 50%, 
+        #d5dfe8 100%);
+    background-attachment: fixed;
+    max-width: var(--a4-width);
+    margin: 0 auto;
+    padding: 20px 0;
+    min-height: 100vh;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: var(--a4-width);
+    height: 100vh;
+    background: linear-gradient(180deg, 
+        #ffffff 0%, 
+        #fafbfc 30%, 
+        #f8f9fa 70%, 
+        #ffffff 100%);
+    box-shadow: 
+        0 0 40px rgba(0, 0, 0, 0.08),
+        0 0 80px rgba(0, 0, 0, 0.04),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    box-shadow: var(--shadow-md);
+    z-index: 1000;
+    height: 64px;
+    display: block;
+    border-top: 3px solid var(--primary-color);
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.brand-icon {
+    font-size: 28px;
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    gap: 8px;
+}
+
+.nav-link {
+    display: block;
+    padding: 10px 20px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    transition: var(--transition);
+}
+
+.nav-link:hover,
+.nav-link.active {
+    color: var(--primary-color);
+    background: rgba(37, 99, 235, 0.08);
+}
+
+.hero {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 100px 32px 60px;
+    margin-top: 64px;
+    border-bottom: 4px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 
+        0 4px 12px rgba(102, 126, 234, 0.3),
+        inset 0 -2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.hero-content {
+    max-width: 100%;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.hero-title {
+    font-size: 36px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+}
+
+.hero-subtitle {
+    font-size: 18px;
+    opacity: 0.95;
+    margin-bottom: 24px;
+}
+
+.hero-meta {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.main-content {
+    max-width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden;
+}
+
+.section {
+    padding: 15mm;
+    margin-bottom: 0;
+    box-shadow: none;
+    border-radius: 0;
+    page-break-inside: auto;
+    page-break-after: auto;
+    border-bottom: 1px solid #e5e7eb;
+    background: white !important;
+    overflow-x: hidden;
+}
+
+.section-header {
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--bg-light);
+}
+
+.section-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.section-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.section-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-left: 52px;
+}
+`;
+
+const TEMPLATE_HTML_RAW = `
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上海产业园区春节前后人流数据分析报告</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand"><span class="brand-icon">📊</span><span class="brand-text">数据分析报告</span></div>
+            <ul class="nav-menu">
+                <li><a href="#overview" class="nav-link active">总览</a></li>
+                <li><a href="#population" class="nav-link">人群画像</a></li>
+                <li><a href="#trends" class="nav-link">人流趋势</a></li>
+                <li><button onclick="window.print()" class="nav-link" style="background:#2563eb;color:#fff;border:none;">导出PDF</button></li>
+            </ul>
+        </div>
+    </nav>
+    <header class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title">上海产业园区春节前后人流数据分析报告</h1>
+            <p class="hero-subtitle">基于工业、科技、金融三类园区的综合分析</p>
+            <div class="hero-meta">
+                <span class="meta-item">📅 春节前后31天</span>
+                <span class="meta-item">🏢 工业/科技/金融</span>
+                <span class="meta-item">📍 上海全市</span>
+            </div>
+        </div>
+    </header>
+    <main class="main-content">
+        <section id="overview" class="section">
+            <div class="section-header">
+                <h2 class="section-title"><span class="section-number">01</span>整体分析总览</h2>
+                <p class="section-desc">人流量变化趋势与复工情况总览</p>
+            </div>
+            <div class="section-summary">
+                <div class="summary-icon">💡</div>
+                <div class="summary-content">
+                    <h4>核心洞察</h4>
+                    <p>春节前后园区人流呈现 V 型复苏态势，节后复工率达到 87.6%，科技园区新增人员比例最高（8.2%）。</p>
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">© 2024 上海产业园区春节前后人流数据分析报告</p>
+            <p class="footer-text">数据来源：园区人脸识别系统</p>
+        </div>
+    </footer>
+</body>
+</html>
+`;
+
+const TEMPLATE_HTML_WITH_CSS = TEMPLATE_HTML_RAW
+  .replace('<link rel="stylesheet" href="styles.css">', `<style>${TEMPLATE_CSS_RAW}</style>`)
+  .replace('<script src="script.js"></script>', '');
+
 // --- 数据常量定义 ---
 const menuStructure = [
   { id: 'home', label: '首页', icon: Home, type: 'item', view: 'home' },
@@ -136,6 +449,16 @@ const menuStructure = [
       { id: 'report-agent', label: '报告智能体', type: 'item' },
       { id: 'report-list', label: '报告列表', type: 'item' },
       { id: 'mail-manage', label: '邮件管理', type: 'item' }
+    ]
+  },
+  {
+    id: 'report-manage',
+    label: '报告管理',
+    icon: Sparkles,
+    type: 'submenu',
+    children: [
+      { id: 'report-favorite', label: '报告收藏', type: 'item', view: 'report-favorite' },
+      { id: 'html-template-manage', label: 'HTML模版管理', type: 'item', view: 'html-template-manage' }
     ]
   },
   {
@@ -316,9 +639,57 @@ const datasetFields = {
 };
 
 // --- API 模拟：实现多轮问答路由引擎 ---
-const simulateAIResponse = (query) => {
+const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
   return new Promise((resolve) => {
     setTimeout(() => {
+      if (mode === 'html') {
+        const safeTitle = templateTitle || query.trim() || '页面原型';
+        const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
+        const fileName = `${fileBase}.html`;
+        const previewHtml = `
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; background:#f6f8fb; padding:24px;">
+            <div style="max-width:860px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
+              <div style="padding:28px 32px;border-bottom:1px solid #f1f5f9;background:linear-gradient(90deg,#eef2ff,#f8fafc);">
+                <div style="font-size:14px;color:#64748b;letter-spacing:0.6px;">HTML 页面原型预览</div>
+                <div style="font-size:26px;font-weight:700;color:#0f172a;margin-top:6px;">${safeTitle}</div>
+                <div style="font-size:14px;color:#64748b;margin-top:10px;max-width:520px;">这是一份可直接落地的页面原型，可按你的需求继续细化模块与视觉风格。</div>
+              </div>
+              <div style="padding:24px 32px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                  <div style="font-size:12px;color:#94a3b8;">模块</div>
+                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">核心指标</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:10px;">展示关键KPI卡片与趋势。</div>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                  <div style="font-size:12px;color:#94a3b8;">模块</div>
+                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">用户分群</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:10px;">呈现人群画像与洞察。</div>
+                </div>
+                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+                  <div style="font-size:12px;color:#94a3b8;">模块</div>
+                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">行动建议</div>
+                  <div style="font-size:12px;color:#64748b;margin-top:10px;">输出可执行的策略建议。</div>
+                </div>
+              </div>
+              <div style="padding:0 32px 28px;">
+                <button style="background:#4f46e5;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;">开始使用</button>
+                <button style="background:#ffffff;color:#4f46e5;border:1px solid #c7d2fe;border-radius:10px;padding:10px 18px;font-weight:600;margin-left:10px;cursor:pointer;">查看详情</button>
+              </div>
+            </div>
+          </div>
+        `;
+        const code = TEMPLATE_HTML_WITH_CSS.replace('上海产业园区春节前后人流数据分析报告', safeTitle);
+        resolve({
+          type: 'html_prototype',
+          title: safeTitle,
+          fileName,
+          code,
+          sql: `-- SQL 示例\nSELECT province_id, SUM(call_fee) AS call_revenue\nFROM user_comm_fee_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY province_id\nORDER BY call_revenue DESC;`,
+          python: `# Python 示例\nimport pandas as pd\n\ndf = pd.read_csv("user_comm_fee_daily.csv")\nresult = (\n    df.query("stat_date >= '2025-01-01' and stat_date <= '2025-12-31'")\n      .groupby("province_id", as_index=False)["call_fee"].sum()\n      .sort_values("call_fee", ascending=False)\n)\nprint(result.head())`,
+          previewHtml: code
+        });
+        return;
+      }
       // 场景 1：精准查询直接出结果
       if (query.includes('2024年12月') && query.includes('湖北省') && query.includes('通话收入')) {
         resolve({
@@ -742,7 +1113,7 @@ const ChatAgentView = ({ onBack }) => {
       <div className="p-6 flex justify-center absolute bottom-0 w-full bg-white/90 backdrop-blur-sm z-20">
         <div className="w-full max-w-4xl relative">
           <div className="absolute -top-12 left-0 flex gap-2">
-            {['智能问数', '报告生成', '探索分析', 'PPT生成', '智能看板', '知识问答'].map((tag) => (
+            {['智能问数', '报告生成', '探索分析', '智能看板', '知识问答'].map((tag) => (
               <button key={tag} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 hover:border-purple-400 hover:text-purple-600 shadow-sm flex items-center gap-1.5 transition-all">
                  {tag === '探索分析' ? <PieChart size={12} className="text-white bg-purple-600 rounded p-0.5 w-4 h-4" /> : null}{tag}
               </button>
@@ -880,27 +1251,89 @@ const AgentManageView = () => {
 };
 
 // --- HomeView：集成多轮对话流引擎 ---
-const HomeView = ({ onNavigate }) => {
+const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports }) => {
   const [inputText, setInputText] = useState('');
   const [activeFiles, setActiveFiles] = useState([{ name: '用户通信费用日表.csv', size: '13.39k' }]);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisMode, setAnalysisMode] = useState('fast');
+  const [generationType, setGenerationType] = useState('qa');
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [showDatasetModal, setShowDatasetModal] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState(null);
+  const [htmlTabById, setHtmlTabById] = useState({});
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(null);
+  const [tempSelectedTemplateId, setTempSelectedTemplateId] = useState(null);
   const [selectedModel, setSelectedModel] = useState('Qwen3-30B-A3B');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showFavoriteConfirm, setShowFavoriteConfirm] = useState(false);
+  const [favoriteInputName, setFavoriteInputName] = useState('');
+  const [showFavoriteSuccess, setShowFavoriteSuccess] = useState(false);
+  const [copiedCodeId, setCopiedCodeId] = useState(null);
+  const [showTemplateWarning, setShowTemplateWarning] = useState(false);
+  const [showTemplateChangeConfirm, setShowTemplateChangeConfirm] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState(null);
+  const [showMoreApps, setShowMoreApps] = useState(false);
+  const [preferredAppIds, setPreferredAppIds] = useState(() => {
+    const saved = window.localStorage.getItem('chatbi_preferred_apps');
+    return saved ? JSON.parse(saved) : ['qa', 'report', 'brief', 'explore', 'html'];
+  });
+  const [activeArtifact, setActiveArtifact] = useState('sql');
+  const [htmlStage, setHtmlStage] = useState(0);
+  const [streamedTextById, setStreamedTextById] = useState({});
+  const [streamedCodeById, setStreamedCodeById] = useState({ sql: '', python: '', html: '' });
+  const [rightTab, setRightTab] = useState('sync'); // 'sync' | 'files'
+  const [showRightPanel, setShowRightPanel] = useState(true);
+  const [openedFile, setOpenedFile] = useState(null); // 'sql' | 'python' | 'html' | null
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [showChatShareModal, setShowChatShareModal] = useState(false);
+  const [chatShareLink, setChatShareLink] = useState('');
+  const [chatShareCopied, setChatShareCopied] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedElInfo, setSelectedElInfo] = useState(null); // { tag, text, rect, path }
+  const [editInstruction, setEditInstruction] = useState('');
+  const [isApplyingEdit, setIsApplyingEdit] = useState(false);
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
   const modelDropdownRef = useRef(null);
+  const codeScrollRef = useRef(null);
+  const previewIframeRef = useRef(null);
+  const leftChatRef = useRef(null);
 
   const modelOptions = ['qwen3-max', 'qwen3-32b', 'Qwen3-30B-A3B', 'qwen3-coder-plus', 'deepseek-v3.2', 'qwen2-72b-instruct'];
+  const htmlTemplates = [
+    { id: 'tpl-1', title: '通用仪表盘', author: 'Admin', date: '2026-10-11', heat: 20 },
+    { id: 'tpl-2', title: '用户分析', author: 'Admin', date: '2026-10-11', heat: 20 },
+    { id: 'tpl-3', title: '运营看板', author: 'Admin', date: '2026-10-11', heat: 20 }
+  ];
+  const appButtons = [
+    { id: 'qa', label: '智能问数', icon: Sparkles, action: () => setGenerationType('qa') },
+    { id: 'report', label: '报告生成', icon: FileText, action: () => setGenerationType('report'), iconClass: 'text-green-500' },
+    { id: 'brief', label: '通报仿写', icon: FileTextIcon },
+    { id: 'explore', label: '探索分析', icon: PieChart, iconClass: 'text-orange-500' },
+    { id: 'html', label: 'HTML页面生成', icon: Code, action: () => setGenerationType('html'), iconClass: 'text-indigo-500' },
+    { id: 'board', label: '智能看板', icon: Layout, action: () => onNavigate('smart-builder'), iconClass: 'text-blue-500' }
+  ];
+  const appMap = Object.fromEntries(appButtons.map((app) => [app.id, app]));
+  const primaryApps = preferredAppIds.map((id) => appMap[id]).filter(Boolean).slice(0, 5);
+  const moreApps = appButtons.filter((app) => !primaryApps.some((p) => p.id === app.id));
+  const latestHtmlMsg = [...messages].reverse().find(msg => msg.type === 'html_prototype');
+  const publicBase = import.meta.env.BASE_URL;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // 左侧聊天区也滚到底部
+    if (leftChatRef.current) {
+      leftChatRef.current.scrollTop = leftChatRef.current.scrollHeight;
+    }
   }, [messages, isLoading]);
 
   useEffect(() => {
@@ -912,6 +1345,399 @@ const HomeView = ({ onNavigate }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('chatbi_preferred_apps', JSON.stringify(preferredAppIds));
+  }, [preferredAppIds]);
+
+  useEffect(() => {
+    if (!latestHtmlMsg) return;
+    let step = 0;
+    setHtmlStage(0);
+    setActiveArtifact('sql');
+    setStreamedCodeById({ sql: '', python: '', html: '' });
+    setRightTab('sync');
+    setOpenedFile(null);
+    const timer = setInterval(() => {
+      step += 1;
+      if (step === 1) {
+        setHtmlStage(1);
+        setActiveArtifact('sql');
+      } else if (step === 2) {
+        setHtmlStage(2);
+        setActiveArtifact('python');
+      } else if (step === 3) {
+        setHtmlStage(3);
+        setActiveArtifact('html');
+        clearInterval(timer);
+      }
+    }, 1200);
+    return () => clearInterval(timer);
+  }, [latestHtmlMsg]);
+
+  useEffect(() => {
+    if (!latestHtmlMsg) return;
+    const fullText = `已生成 HTML 页面原型草稿：${latestHtmlMsg.fileName}。将按 SQL → Python → HTML 的顺序产出文件，并在右侧预览。`;
+    let i = 0;
+    const id = latestHtmlMsg.id;
+    const timer = setInterval(() => {
+      i += 1;
+      setStreamedTextById((prev) => ({ ...prev, [id]: fullText.slice(0, i) }));
+      if (i >= fullText.length) clearInterval(timer);
+    }, 18);
+    return () => clearInterval(timer);
+  }, [latestHtmlMsg]);
+
+  useEffect(() => {
+    if (!latestHtmlMsg) return;
+    if (htmlStage === 1) {
+      const full = latestHtmlMsg.sql || '';
+      let i = 0;
+      const timer = setInterval(() => {
+        i += 4;
+        setStreamedCodeById((prev) => ({ ...prev, sql: full.slice(0, i) }));
+        if (i >= full.length) clearInterval(timer);
+      }, 3);
+      return () => clearInterval(timer);
+    }
+    if (htmlStage === 2) {
+      const full = latestHtmlMsg.python || '';
+      let i = 0;
+      const timer = setInterval(() => {
+        i += 4;
+        setStreamedCodeById((prev) => ({ ...prev, python: full.slice(0, i) }));
+        if (i >= full.length) clearInterval(timer);
+      }, 3);
+      return () => clearInterval(timer);
+    }
+    if (htmlStage === 3) {
+      const full = latestHtmlMsg.code || '';
+      let i = 0;
+      const timer = setInterval(() => {
+        i += 6;
+        setStreamedCodeById((prev) => ({ ...prev, html: full.slice(0, i) }));
+        if (i >= full.length) {
+          clearInterval(timer);
+          setActiveArtifact('preview');
+          setRightTab('files');
+        }
+      }, 2);
+      return () => clearInterval(timer);
+    }
+  }, [latestHtmlMsg, htmlStage]);
+
+  // 右侧代码区自动滚动到底部
+  useEffect(() => {
+    if (codeScrollRef.current) {
+      codeScrollRef.current.scrollTop = codeScrollRef.current.scrollHeight;
+    }
+  }, [streamedCodeById, activeArtifact]);
+
+  // 切换时清理选择模式
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelectedElInfo(null);
+  }, [activeArtifact, openedFile, rightTab]);
+
+  const handleChatShare = () => {
+    const reportUrl = `${window.location.origin}${publicBase}yuanqu/index.html`;
+    const chatHtml = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ChatBI 会话分享</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#f4f6f8;color:#1f2937;line-height:1.6}
+.container{max-width:900px;margin:0 auto;padding:24px 16px}
+.header{text-align:center;padding:32px 0 24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px}
+.header h1{font-size:22px;font-weight:700;color:#1f2937}
+.header p{font-size:13px;color:#9ca3af;margin-top:6px}
+.msg{margin-bottom:16px;display:flex;gap:12px}
+.msg.user{justify-content:flex-end}
+.msg.user .bubble{background:#eff6ff;border:1px solid #bfdbfe;border-radius:16px 16px 4px 16px;max-width:75%}
+.msg.ai{justify-content:flex-start}
+.avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;border:1px solid #e5e7eb;background:#fff}
+.bubble{padding:10px 16px;font-size:14px;border-radius:16px 16px 16px 4px;max-width:75%;background:#fff;border:1px solid #e5e7eb;white-space:pre-line}
+.bubble.edit{background:#ecfdf5;border-color:#a7f3d0}
+.edit-tag{font-size:11px;color:#059669;font-weight:600;margin-bottom:4px}
+.report-frame{margin-top:24px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff}
+.report-frame .frame-header{background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:8px 16px;font-size:12px;color:#6b7280}
+.report-frame iframe{width:100%;height:600px;border:0}
+.footer{text-align:center;padding:24px 0;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;margin-top:32px}
+</style></head><body>
+<div class="container">
+<div class="header"><h1>ChatBI 会话分享</h1><p>生成时间：${new Date().toLocaleString('zh-CN')}</p></div>
+${messages.map(msg => {
+  if (msg.role === 'user') {
+    return `<div class="msg user"><div class="bubble">${msg.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>`;
+  }
+  const isEdit = msg.type === 'edit_reply';
+  const text = msg.text || msg.queryInfo || '已生成回复。';
+  return `<div class="msg ai"><div class="avatar">🤖</div><div class="bubble${isEdit ? ' edit' : ''}">${isEdit ? '<div class="edit-tag">✅ 修改已完成</div>' : ''}${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>`;
+}).join('\\n')}
+<div class="report-frame"><div class="frame-header">📊 生成的报告预览</div><iframe src="${reportUrl}"></iframe></div>
+<div class="footer">由 ChatBI 生成 · AI 决策助手</div>
+</div></body></html>`;
+
+    const blob = new Blob([chatHtml], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    setChatShareLink(url);
+    setShowChatShareModal(true);
+    setChatShareCopied(false);
+  };
+
+  const isReportFavorited = latestHtmlMsg ? favoriteReports.some(r => r.id === latestHtmlMsg.id) : false;
+
+  const toggleFavoriteReport = () => {
+    if (!latestHtmlMsg) return;
+    if (isReportFavorited) {
+      setFavoriteReports(prev => prev.filter(r => r.id !== latestHtmlMsg.id));
+    } else {
+      setFavoriteInputName(latestHtmlMsg.fileName.replace('.html', ''));
+      setShowFavoriteConfirm(true);
+    }
+  };
+
+  const confirmFavorite = () => {
+    if (!latestHtmlMsg) return;
+    setFavoriteReports(prev => [...prev, {
+      id: latestHtmlMsg.id,
+      name: (favoriteInputName.trim() || latestHtmlMsg.fileName.replace('.html', '')),
+      creator: '当前用户',
+      createdAt: new Date().toLocaleString('zh-CN'),
+    }]);
+    setShowFavoriteConfirm(false);
+    setFavoriteInputName('');
+    setShowFavoriteSuccess(true);
+    setTimeout(() => setShowFavoriteSuccess(false), 3000);
+  };
+
+  const handleCopyCode = (code, id) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCodeId(id);
+    setTimeout(() => setCopiedCodeId(null), 2000);
+  };
+
+  const removeFavoriteReport = (reportId) => {
+    setFavoriteReports(prev => prev.filter(r => r.id !== reportId));
+  };
+
+  const handleDownloadZip = async () => {
+    const baseUrl = `${publicBase}yuanqu/`;
+    const files = ['index.html', 'styles.css', 'script.js'];
+    const zip = new JSZip();
+    await Promise.all(files.map(async (name) => {
+      const res = await fetch(baseUrl + name);
+      const text = await res.text();
+      zip.file(name, text);
+    }));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const zipName = latestHtmlMsg ? latestHtmlMsg.fileName.replace('.html', '') : 'report';
+    saveAs(blob, `${zipName}.zip`);
+  };
+
+  // 选择模式 - 注入 iframe 交互
+  const enableSelectionMode = () => {
+    setSelectionMode(true);
+    setSelectedElInfo(null);
+    const iframe = previewIframeRef.current;
+    if (!iframe || !iframe.contentDocument) return;
+    const doc = iframe.contentDocument;
+
+    // 注入高亮样式
+    if (!doc.getElementById('__select_style')) {
+      const style = doc.createElement('style');
+      style.id = '__select_style';
+      style.textContent = `
+        .__hover_highlight { outline: 2px dashed #3b82f6 !important; outline-offset: 2px; cursor: crosshair !important; }
+        .__selected_highlight { outline: 3px solid #3b82f6 !important; outline-offset: 2px; background-color: rgba(59,130,246,0.06) !important; }
+      `;
+      doc.head.appendChild(style);
+    }
+
+    let lastHovered = null;
+
+    const onMouseOver = (e) => {
+      if (lastHovered && lastHovered !== e.target) lastHovered.classList.remove('__hover_highlight');
+      e.target.classList.add('__hover_highlight');
+      lastHovered = e.target;
+    };
+    const onMouseOut = (e) => { e.target.classList.remove('__hover_highlight'); };
+    const onClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 清理之前的选中
+      doc.querySelectorAll('.__selected_highlight').forEach(el => el.classList.remove('__selected_highlight'));
+      if (lastHovered) lastHovered.classList.remove('__hover_highlight');
+
+      const el = e.target;
+      el.classList.add('__selected_highlight');
+
+      // 获取元素信息
+      const iframeRect = iframe.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      setSelectedElInfo({
+        tag: el.tagName.toLowerCase(),
+        text: el.innerText?.slice(0, 80) || '',
+        className: el.className.replace(/__\w+_highlight/g, '').trim(),
+        // 相对于 iframe 容器的位置
+        rect: {
+          top: iframeRect.top + elRect.top,
+          left: iframeRect.left + elRect.left,
+          width: elRect.width,
+          height: elRect.height,
+          bottom: iframeRect.top + elRect.bottom,
+          right: iframeRect.left + elRect.right,
+        },
+        element: el,
+      });
+      setEditInstruction('');
+    };
+
+    doc.addEventListener('mouseover', onMouseOver, true);
+    doc.addEventListener('mouseout', onMouseOut, true);
+    doc.addEventListener('click', onClick, true);
+
+    // 存引用以便清理
+    iframe.__selectionCleanup = () => {
+      doc.removeEventListener('mouseover', onMouseOver, true);
+      doc.removeEventListener('mouseout', onMouseOut, true);
+      doc.removeEventListener('click', onClick, true);
+      doc.querySelectorAll('.__hover_highlight, .__selected_highlight').forEach(el => {
+        el.classList.remove('__hover_highlight', '__selected_highlight');
+      });
+    };
+  };
+
+  const disableSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedElInfo(null);
+    const iframe = previewIframeRef.current;
+    if (iframe && iframe.__selectionCleanup) {
+      iframe.__selectionCleanup();
+      iframe.__selectionCleanup = null;
+    }
+  };
+
+  // 保存 iframe 快照
+  const saveSnapshot = () => {
+    const iframe = previewIframeRef.current;
+    if (!iframe?.contentDocument) return null;
+    return iframe.contentDocument.documentElement.innerHTML;
+  };
+
+  // 恢复 iframe 快照
+  const restoreSnapshot = (snapshot) => {
+    const iframe = previewIframeRef.current;
+    if (!iframe?.contentDocument || !snapshot) return;
+    iframe.contentDocument.documentElement.innerHTML = snapshot;
+    // 重新注入选择模式（如果处于选择状态）
+    if (selectionMode) {
+      disableSelectionMode();
+    }
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const currentSnapshot = saveSnapshot();
+    setRedoStack(prev => [...prev, currentSnapshot]);
+    const prevSnapshot = undoStack[undoStack.length - 1];
+    setUndoStack(prev => prev.slice(0, -1));
+    restoreSnapshot(prevSnapshot);
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const currentSnapshot = saveSnapshot();
+    setUndoStack(prev => [...prev, currentSnapshot]);
+    const nextSnapshot = redoStack[redoStack.length - 1];
+    setRedoStack(prev => prev.slice(0, -1));
+    restoreSnapshot(nextSnapshot);
+  };
+
+  const handleApplyEdit = () => {
+    if (!editInstruction.trim() || !selectedElInfo?.element) return;
+    setIsApplyingEdit(true);
+
+    const instruction = editInstruction.trim();
+    const elementDesc = selectedElInfo.text?.slice(0, 30) || `<${selectedElInfo.tag}>`;
+
+    // 1. 左侧发送用户消息
+    const userMsg = { id: Date.now(), role: 'user', content: `[选中元素: ${elementDesc}] ${instruction}` };
+    setMessages(prev => [...prev, userMsg]);
+
+    // 保存当前状态到 undoStack
+    const snapshot = saveSnapshot();
+    if (snapshot) {
+      setUndoStack(prev => [...prev, snapshot]);
+      setRedoStack([]);
+    }
+
+    // 模拟 AI 处理
+    setTimeout(() => {
+      const el = selectedElInfo.element;
+      const lowerInstruction = instruction.toLowerCase();
+      let actionDesc = '';
+
+      if (lowerInstruction.includes('红色') || lowerInstruction.includes('red')) {
+        el.style.color = '#ef4444';
+        actionDesc = '已将文字颜色修改为红色';
+      } else if (lowerInstruction.includes('加粗') || lowerInstruction.includes('bold')) {
+        el.style.fontWeight = '700';
+        actionDesc = '已将文字加粗显示';
+      } else if (lowerInstruction.includes('放大') || lowerInstruction.includes('大')) {
+        el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * 1.3) + 'px';
+        actionDesc = '已放大文字尺寸';
+      } else if (lowerInstruction.includes('隐藏') || lowerInstruction.includes('删除') || lowerInstruction.includes('去掉')) {
+        el.style.display = 'none';
+        actionDesc = '已隐藏该元素';
+      } else if (lowerInstruction.includes('蓝色') || lowerInstruction.includes('blue')) {
+        el.style.color = '#3b82f6';
+        actionDesc = '已将文字颜色修改为蓝色';
+      } else if (lowerInstruction.includes('背景')) {
+        el.style.backgroundColor = '#fef3c7';
+        actionDesc = '已为该元素添加高亮背景色';
+      } else {
+        if (el.children.length === 0) {
+          el.textContent = instruction;
+        }
+        actionDesc = '已更新元素内容';
+      }
+
+      // 2. 左侧返回 AI 回复
+      const aiMsg = {
+        id: Date.now() + 1,
+        role: 'ai',
+        type: 'edit_reply',
+        text: `${actionDesc}。\n\n针对「${elementDesc}」的修改已应用到右侧预览中，请查看效果。如需调整可继续选择元素修改，或点击撤销恢复。`,
+      };
+      setMessages(prev => [...prev, aiMsg]);
+
+      setIsApplyingEdit(false);
+      setSelectedElInfo(null);
+      setEditInstruction('');
+      const iframe = previewIframeRef.current;
+      if (iframe?.contentDocument) {
+        iframe.contentDocument.querySelectorAll('.__selected_highlight').forEach(node => node.classList.remove('__selected_highlight'));
+      }
+    }, 800);
+  };
+
+  const togglePreferredApp = (id) => {
+    setPreferredAppIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((item) => item !== id);
+      }
+      if (prev.length < 5) {
+        return [...prev, id];
+      }
+      return [...prev.slice(1), id];
+    });
+  };
+
+  const handleAppSelect = (app) => {
+    app.action?.();
+    setShowMoreApps(false);
+  };
 
   const handleSuggestionClick = (item) => {
     setActiveFiles(item.files);
@@ -942,29 +1768,58 @@ const HomeView = ({ onNavigate }) => {
     const text = textOverride || inputText;
     if (!text.trim()) return;
 
+    // HTML 模式下必须选择模版
+    if (generationType === 'html' && !selectedTemplateId) {
+      setShowTemplateWarning(true);
+      setTimeout(() => setShowTemplateWarning(false), 3000);
+      return;
+    }
+
     const newUserMsg = { id: Date.now(), role: 'user', content: text };
     setMessages(prev => [...prev, newUserMsg]);
     setInputText('');
     setIsLoading(true);
 
-    const responseData = await simulateAIResponse(text);
+    const templateTitle = htmlTemplates.find(t => t.id === selectedTemplateId)?.title || '';
+    const responseData = await simulateAIResponse(text, generationType, templateTitle);
 
     setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', ...responseData }]);
     setIsLoading(false);
+    setActiveArtifact('sql');
   };
 
   // 通过内联函数直接返回 JSX，避免焦点丢失
   const renderInputBox = () => (
-    <div className="w-full bg-white border-2 border-purple-600 rounded-2xl shadow-xl p-4 transition-all focus-within:ring-4 focus-within:ring-purple-100 pointer-events-auto relative">
+    <div className="w-full bg-white border-2 border-purple-600 rounded-2xl shadow-xl p-2 transition-all focus-within:ring-4 focus-within:ring-purple-100 pointer-events-auto relative">
+      {/* 未选模版提示 */}
+      {showTemplateWarning && (
+        <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 bg-red-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-lg whitespace-nowrap animate-in fade-in slide-in-from-bottom-1">
+          请先选择一个报告模版再发送
+        </div>
+      )}
       {activeFiles.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 mb-2">
+        <div className="flex flex-wrap items-center gap-2 mb-1">
           {activeFiles.map((file, index) => (
-            <div key={index} className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 text-xs shadow-sm">
-              <div className="w-5 h-5 bg-green-100 rounded flex items-center justify-center text-green-600"><FileSpreadsheet size={12} /></div>
+            <div key={index} className="inline-flex items-center gap-2 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200 text-[11px] shadow-sm">
+              <div className="w-4 h-4 bg-green-100 rounded flex items-center justify-center text-green-600"><FileSpreadsheet size={10} /></div>
               <span className="text-gray-700 max-w-[150px] truncate font-medium">{file.name}</span>
               <button onClick={() => removeFile(index)} className="text-gray-400 hover:text-red-500 hover:bg-white rounded-full p-0.5 transition-colors"><X size={12} /></button>
             </div>
           ))}
+          {selectedTemplateId && (
+            <div className="inline-flex items-center gap-2 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200 text-[11px] shadow-sm">
+              <div className="w-4 h-4 bg-emerald-100 rounded flex items-center justify-center text-emerald-600"><LayoutTemplate size={10} /></div>
+              <span className="text-emerald-700 max-w-[150px] truncate font-medium">{htmlTemplates.find(t => t.id === selectedTemplateId)?.title}</span>
+              <button onClick={() => {
+                if (isChatting) {
+                  setPendingTemplateId('__remove__');
+                  setShowTemplateChangeConfirm(true);
+                } else {
+                  setSelectedTemplateId(null);
+                }
+              }} className="text-emerald-400 hover:text-emerald-600 hover:bg-white rounded-full p-0.5 transition-colors"><X size={12} /></button>
+            </div>
+          )}
         </div>
       )}
 
@@ -973,32 +1828,105 @@ const HomeView = ({ onNavigate }) => {
         value={inputText}
         onChange={(e) => setInputText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-        className="w-full h-12 resize-none border-none focus:ring-0 text-gray-800 placeholder-gray-400 text-base bg-transparent p-0 mb-2 leading-relaxed"
-        placeholder="请输入您想查询和分析的问题，或点击上方示例快速体验..."
+        className="w-full h-6 resize-none border-none focus:ring-0 text-gray-800 placeholder-gray-400 text-sm bg-transparent p-0 mb-1 leading-relaxed"
+        placeholder=""
       ></textarea>
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+      <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-50">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 p-0.5 rounded-lg">
-            <button onClick={() => setAnalysisMode('fast')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'fast' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              <Zap size={14} /> 快速分析
+            <button onClick={() => setAnalysisMode('fast')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'fast' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Zap size={14} />
             </button>
-            <button onClick={() => setAnalysisMode('deep')} className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'deep' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              <BrainCircuit size={14} /> 深度思考
+            <button onClick={() => setAnalysisMode('deep')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'deep' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <BrainCircuit size={14} />
             </button>
           </div>
 
           <div className="h-5 w-px bg-gray-200"></div>
 
-          <button onClick={() => setShowDatasetModal(true)} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-200 transition-colors shadow-sm">
-            <Database size={14} /> 选择数据集
+          <button onClick={() => setShowDatasetModal(true)} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-200 transition-colors shadow-sm">
+            <Database size={14} />
           </button>
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
-            <FileSpreadsheet size={14} /> 上传文件
+          {generationType === 'html' && (
+            <div className="relative">
+              <button
+                onClick={() => { setTempSelectedTemplateId(selectedTemplateId); setShowTemplateMenu(true); setShowTemplateWarning(false); }}
+                className={`flex items-center justify-center text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${showTemplateWarning ? 'text-red-600 bg-red-50 border-red-300 animate-pulse' : !selectedTemplateId ? 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' : 'text-gray-600 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 border-transparent hover:border-emerald-200'}`}
+              >
+                <LayoutTemplate size={14} />
+              </button>
+              {showTemplateMenu && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/30" onClick={() => setShowTemplateMenu(false)}></div>
+                  <div className="relative w-[760px] bg-white border border-blue-500 rounded-2xl shadow-2xl py-6 px-6">
+                    <button onClick={() => setShowTemplateMenu(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                    <div className="text-base font-semibold text-gray-700 mb-6">报告模板选择</div>
+                    <div className="grid grid-cols-3 gap-6">
+                      {htmlTemplates.map((tpl) => (
+                        <button
+                          key={tpl.id}
+                          onClick={() => setTempSelectedTemplateId(tpl.id)}
+                          className={`text-left border-2 rounded-2xl p-4 transition-colors ${
+                            tempSelectedTemplateId === tpl.id ? 'border-blue-500 shadow-sm' : 'border-gray-300 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="h-28 rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 text-white flex items-center justify-center text-xs font-semibold">
+                            2026年上/中/下旬问题多人群画像分析报告
+                          </div>
+                          <div className="mt-3 text-base font-semibold text-gray-800">{tpl.title}</div>
+                          <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
+                            <span>{tpl.author}</span>
+                            <span>{tpl.date}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-6 flex items-center justify-between text-sm text-gray-500">
+                      <div className="flex items-center gap-2">
+                        <span>共 67 条</span>
+                        <div className="flex items-center gap-1">
+                          {['1', '2', '3', '4', '5', '6', '7'].map((p) => (
+                            <button key={p} className={`w-8 h-8 rounded-lg border ${p === '1' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-gray-200 text-gray-600'}`}>
+                              {p}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setShowTemplateMenu(false)} className="w-24 h-9 rounded-xl border border-blue-500 text-blue-600 hover:bg-blue-50">取消</button>
+                        <button
+                          onClick={() => {
+                            if (!tempSelectedTemplateId) return;
+                            // 已在对话中且切换了不同模版，弹确认
+                            if (isChatting && selectedTemplateId && tempSelectedTemplateId !== selectedTemplateId) {
+                              setPendingTemplateId(tempSelectedTemplateId);
+                              setShowTemplateMenu(false);
+                              setShowTemplateChangeConfirm(true);
+                            } else {
+                              setSelectedTemplateId(tempSelectedTemplateId);
+                              setShowTemplateMenu(false);
+                            }
+                          }}
+                          className="w-24 h-9 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          确定
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
+            <FileSpreadsheet size={14} />
           </button>
-          <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} className={`flex items-center gap-1.5 text-xs font-medium transition-colors px-3 py-1.5 rounded-lg border shadow-sm ${webSearchEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-indigo-50 hover:text-indigo-600'}`}>
-            <Globe size={14} /> 网络检索
-          </button>
+          {generationType === 'explore' && (
+            <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} className={`flex items-center justify-center text-xs font-medium transition-colors px-3 py-1.5 rounded-lg border shadow-sm ${webSearchEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-indigo-50 hover:text-indigo-600'}`}>
+              <Globe size={14} />
+            </button>
+          )}
         </div>
 
         <button
@@ -1171,11 +2099,75 @@ const HomeView = ({ onNavigate }) => {
           </div>
         );
       }
+
+      if (msg.type === 'html_prototype') {
+        const activeTab = htmlTabById[msg.id] || 'preview';
+        return (
+          <div key={msg.id} className="flex items-start gap-4 mb-6 w-full max-w-5xl animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-gray-200 shadow-sm">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white"><Code size={14} /></div>
+            </div>
+            <div className="flex-1 bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-gray-800">HTML 页面原型已生成</div>
+                  <div className="text-xs text-gray-500 mt-1">文件：{msg.fileName}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHtmlTabById(prev => ({ ...prev, [msg.id]: 'code' }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${activeTab === 'code' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}
+                  >
+                    代码
+                  </button>
+                  <button
+                    onClick={() => setHtmlTabById(prev => ({ ...prev, [msg.id]: 'preview' }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${activeTab === 'preview' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'}`}
+                  >
+                    预览
+                  </button>
+                </div>
+              </div>
+
+              {activeTab === 'code' ? (
+                <div className="mt-4 relative">
+                  <button
+                    onClick={() => handleCopyCode(msg.code, `inline-${msg.id}`)}
+                    className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700"
+                  >
+                    {copiedCodeId === `inline-${msg.id}` ? <><Check size={12} /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                  </button>
+                  <pre className="text-xs bg-gray-900 text-gray-100 rounded-xl p-4 overflow-auto max-h-[420px] whitespace-pre-wrap">
+                    {msg.code}
+                  </pre>
+                </div>
+              ) : (
+                <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden bg-white">
+                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500">HTML 页面预览</div>
+                    <iframe
+                      title="html-preview-inline"
+                      className="w-full border-0"
+                      style={{ height: '460px' }}
+                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                      src={`${publicBase}yuanqu/index.html`}
+                    />
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 mt-4 text-xs text-gray-500">
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-600 px-2 py-1 border border-indigo-100"><Code size={12} /> 可继续迭代视觉与模块结构</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-600 px-2 py-1 border border-emerald-100"><LayoutTemplate size={12} /> 基于需求快速出原型</span>
+              </div>
+            </div>
+          </div>
+        );
+      }
     }
     return null;
   };
 
   const isChatting = messages.length > 0;
+  const isHtmlWorkspace = generationType === 'html' && Boolean(latestHtmlMsg);
 
   return (
     <div className={`flex h-full justify-center overflow-hidden transition-colors duration-500 ${isChatting ? 'bg-[#f4f6f8]' : 'bg-white'}`}>
@@ -1183,7 +2175,202 @@ const HomeView = ({ onNavigate }) => {
       <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls" multiple onChange={handleFileUpload} />
       {showDatasetModal && <DatasetSelectionModal onClose={() => setShowDatasetModal(false)} onConfirm={handleDatasetConfirm} />}
 
-      <div className="flex-1 flex flex-col items-center overflow-y-auto custom-scrollbar relative h-full">
+      {/* 收藏确认弹窗 */}
+      {showFavoriteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowFavoriteConfirm(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Sparkles size={18} className="text-orange-400" /> 收藏报告</h3>
+              <button onClick={() => setShowFavoriteConfirm(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">报告名称</label>
+              <input
+                type="text"
+                value={favoriteInputName}
+                onChange={(e) => setFavoriteInputName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmFavorite(); }}
+                placeholder="请输入报告名称"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+                autoFocus
+              />
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-orange-700 leading-relaxed">收藏后可在左侧菜单「报告管理」中查看、分享和下载。</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowFavoriteConfirm(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={confirmFavorite}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors flex items-center gap-1.5"
+              >
+                <Sparkles size={14} /> 确认收藏
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFavoriteSuccess && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[200] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-white border border-green-200 rounded-2xl shadow-xl px-6 py-4 flex items-start gap-3 max-w-md">
+            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckSquare size={18} className="text-green-600" />
+            </div>
+            <div>
+              <div className="text-sm font-bold text-gray-800 mb-0.5">收藏成功</div>
+              <div className="text-xs text-gray-500 leading-relaxed">恭喜您，报告收藏成功！收藏的报告可以在左侧菜单「报告管理」中查看。</div>
+            </div>
+            <button onClick={() => setShowFavoriteSuccess(false)} className="text-gray-300 hover:text-gray-500 flex-shrink-0 mt-0.5"><X size={14} /></button>
+          </div>
+        </div>
+      )}
+
+      {/* 分享弹窗 */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Share2 size={18} className="text-blue-600" /> 创建分享链接</h3>
+              <button onClick={() => setShowShareModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-amber-700 leading-relaxed">任何获得链接的人都可以查看你生成的报告内容，请检查是否包含敏感或隐私内容。</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-600 truncate select-all">
+                {`${window.location.origin}${publicBase}yuanqu/index.html`}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}${publicBase}yuanqu/index.html`);
+                  setShareLinkCopied(true);
+                  setTimeout(() => setShareLinkCopied(false), 2000);
+                }}
+                className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${shareLinkCopied ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              >
+                {shareLinkCopied ? '已复制' : '复制链接'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 下载确认弹窗 */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDownloadModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Download size={18} className="text-blue-600" /> 下载报告文件</h3>
+              <button onClick={() => setShowDownloadModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">将下载以下文件的压缩包：</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-gray-700"><FileText size={14} className="text-blue-500" /> index.html</div>
+              <div className="flex items-center gap-2 text-sm text-gray-700"><Code size={14} className="text-yellow-500" /> styles.css</div>
+              <div className="flex items-center gap-2 text-sm text-gray-700"><Code size={14} className="text-emerald-500" /> script.js</div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowDownloadModal(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={() => { setShowDownloadModal(false); handleDownloadZip(); }}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                确认下载
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 切换模版确认弹窗 */}
+      {showTemplateChangeConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowTemplateChangeConfirm(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><RefreshCw size={18} className="text-orange-500" /> 切换报告模版</h3>
+              <button onClick={() => setShowTemplateChangeConfirm(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-orange-700 leading-relaxed font-medium mb-1">切换模版将重置当前会话</p>
+              <p className="text-sm text-orange-600 leading-relaxed">所有对话记录、生成的文件和报告预览都将被清除并重新生成，此操作不可撤销。</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowTemplateChangeConfirm(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={() => {
+                  if (pendingTemplateId === '__remove__') {
+                    setSelectedTemplateId(null);
+                  } else {
+                    setSelectedTemplateId(pendingTemplateId);
+                  }
+                  setMessages([]);
+                  setHtmlStage(0);
+                  setStreamedCodeById({ sql: '', python: '', html: '' });
+                  setStreamedTextById({});
+                  setActiveArtifact('sql');
+                  setRightTab('sync');
+                  setOpenedFile(null);
+                  setUndoStack([]);
+                  setRedoStack([]);
+                  setShowTemplateChangeConfirm(false);
+                  setPendingTemplateId(null);
+                }}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+              >
+                确认切换
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 会话分享弹窗 */}
+      {showChatShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowChatShareModal(false); if (chatShareLink) URL.revokeObjectURL(chatShareLink); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><MessageSquare size={18} className="text-blue-600" /> 分享会话</h3>
+              <button onClick={() => { setShowChatShareModal(false); if (chatShareLink) URL.revokeObjectURL(chatShareLink); }} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+              <p className="text-sm text-blue-700 leading-relaxed">分享链接将包含完整的对话记录和生成的报告预览，收到链接的人可以查看全部内容。</p>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5">
+              <div className="text-xs text-gray-400 mb-2">分享内容包含：</div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1 text-gray-600"><MessageSquare size={11} /> 全部对话 ({messages.length} 条)</span>
+                <span className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded-full px-2.5 py-1 text-gray-600"><FileText size={11} /> 生成报告预览</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  // 下载分享页面 HTML 文件
+                  const a = document.createElement('a');
+                  a.href = chatShareLink;
+                  a.download = 'chatbi-share.html';
+                  a.click();
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Download size={14} /> 下载分享页面
+              </button>
+              <button
+                onClick={() => {
+                  // 在新标签页打开预览
+                  window.open(chatShareLink, '_blank');
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Globe size={14} /> 预览分享页面
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col items-center overflow-hidden custom-scrollbar relative h-full">
         {!isChatting && (
           <div ref={modelDropdownRef} className="absolute top-[30px] left-[30px] z-30">
             <button
@@ -1209,7 +2396,7 @@ const HomeView = ({ onNavigate }) => {
           </div>
         )}
 
-        <div className={`max-w-5xl w-full mx-auto px-6 flex flex-col items-center relative z-10 ${isChatting ? 'pb-20 pt-16' : 'min-h-full justify-center py-10'}`}>
+        <div className={`w-full mx-auto flex flex-col items-center relative z-10 ${isChatting ? 'flex-1 min-h-0' : 'min-h-full justify-center py-10'}`}>
 
           {!isChatting ? (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-500">
@@ -1228,14 +2415,57 @@ const HomeView = ({ onNavigate }) => {
               </div>
 
               {/* 顶部悬浮功能按钮 */}
-              <div className="flex items-center justify-center gap-3 mb-10 w-full flex-wrap">
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-purple-600 text-white rounded-xl shadow-md hover:bg-purple-700 transition-colors"><Sparkles size={16} /><span className="font-medium text-sm">智能问数</span></button>
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm"><FileText size={16} className="text-green-500" /><span className="font-medium text-sm">报告生成</span></button>
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm"><FileTextIcon size={16} className="text-blue-500" /><span className="font-medium text-sm">通报仿写</span></button>
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm"><PieChart size={16} className="text-orange-500" /><span className="font-medium text-sm">探索分析</span></button>
-                <button className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm"><Presentation size={16} className="text-red-500" /><span className="font-medium text-sm">PPT生成</span></button>
-                <button onClick={() => onNavigate('smart-builder')} className="flex items-center gap-2 px-6 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-all shadow-sm cursor-pointer"><Layout size={16} className="text-blue-500" /><span className="font-medium text-sm">智能看板</span></button>
-                <button onClick={() => onNavigate('agents')} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-gray-500 rounded-xl hover:bg-gray-50 transition-all shadow-sm"><Grid size={16} /><span className="font-medium text-sm">更多应用</span></button>
+              <div className="flex flex-col items-center gap-3 mb-10 w-full">
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  {primaryApps.map((app) => {
+                    const Icon = app.icon;
+                    const isActive = app.id === generationType;
+                    return (
+                      <button
+                        key={app.id}
+                        onClick={app.action}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium border shadow-sm transition-colors ${isActive ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <Icon size={14} className={app.iconClass} /> {app.label}
+                      </button>
+                    );
+                  })}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMoreApps((prev) => !prev)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                    >
+                      <Grid size={14} /> 更多应用
+                    </button>
+                    {showMoreApps && (
+                      <div className="absolute left-0 top-[calc(100%+8px)] w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-30">
+                        <div className="px-4 py-2 text-[11px] text-gray-400">自定义前 5 个应用</div>
+                        {appButtons.map((app) => {
+                          const Icon = app.icon;
+                          const isPreferred = preferredAppIds.includes(app.id);
+                          const isActive = app.id === generationType;
+                          return (
+                            <div
+                              key={app.id}
+                              className={`px-4 py-2 text-xs flex items-center justify-between gap-2 ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'} cursor-pointer`}
+                            >
+                              <div className="flex items-center gap-2" onClick={() => handleAppSelect(app)}>
+                                <Icon size={14} className={app.iconClass} />
+                                <span className={`${isActive ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>{app.label}</span>
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); togglePreferredApp(app.id); }}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border ${isPreferred ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white text-gray-400 border-gray-200'}`}
+                              >
+                                固定
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* 中央输入框 */}
@@ -1254,6 +2484,408 @@ const HomeView = ({ onNavigate }) => {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+          ) : isHtmlWorkspace ? (
+            <div className="w-full max-w-none mx-auto flex-1 min-h-0">
+              <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${showRightPanel ? 'grid-cols-1 lg:grid-cols-[44%_56%]' : 'grid-cols-1'}`}>
+                <div className="border-r border-gray-200 bg-white flex flex-col h-full overflow-hidden">
+
+                  <div ref={leftChatRef} className="px-6 pb-4 pt-4 flex-1 space-y-4 overflow-y-auto min-h-0">
+                    {messages.map((msg) => (
+                      msg.role === 'user' ? (
+                        <div key={msg.id} className="flex justify-end">
+                          <div className="max-w-[85%] bg-blue-50 text-gray-800 border border-blue-100 px-4 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed">
+                            {msg.content}
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={msg.id} className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600"><Bot size={14} /></div>
+                          <div className="flex-1">
+                            {msg.type === 'edit_reply' ? (
+                              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
+                                <div className="flex items-center gap-1.5 text-emerald-600 font-medium text-xs mb-1.5"><CheckSquare size={13} /> 修改已完成</div>
+                                <div className="whitespace-pre-line">{msg.text}</div>
+                              </div>
+                            ) : (
+                              <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
+                                {msg.type === 'html_prototype'
+                                  ? (streamedTextById[msg.id] || '')
+                                  : (msg.text || msg.queryInfo || '已生成回复。')}
+                              </div>
+                            )}
+                            {msg.type === 'html_prototype' && (
+                              <div className="mt-3 space-y-2">
+                                <button
+                                  onClick={() => { if (htmlStage >= 1) { setShowRightPanel(true); setRightTab('files'); setOpenedFile('sql'); } }}
+                                  className={`w-full text-left border rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${htmlStage >= 1 ? (rightTab === 'files' && openedFile === 'sql' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50') : 'border-gray-200 text-gray-300 cursor-not-allowed'}`}
+                                >
+                                  编写SQL文件
+                                </button>
+                                <button
+                                  onClick={() => { if (htmlStage >= 2) { setShowRightPanel(true); setRightTab('files'); setOpenedFile('python'); } }}
+                                  className={`w-full text-left border rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${htmlStage >= 2 ? (rightTab === 'files' && openedFile === 'python' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50') : 'border-gray-200 text-gray-300 cursor-not-allowed'}`}
+                                >
+                                  编写Python文件
+                                </button>
+                                <button
+                                  onClick={() => { if (htmlStage >= 3) { setShowRightPanel(true); setRightTab('files'); setOpenedFile('html'); } }}
+                                  className={`w-full text-left border rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${htmlStage >= 3 ? (rightTab === 'files' && openedFile === 'html' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50') : 'border-gray-200 text-gray-300 cursor-not-allowed'}`}
+                                >
+                                  编写HTML文件
+                                </button>
+                                <button
+                                  onClick={() => { if (htmlStage >= 3) { setShowRightPanel(true); setRightTab('files'); setOpenedFile('html_preview'); } }}
+                                  className={`w-full text-left border rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-white flex items-center gap-3 transition-colors ${htmlStage >= 3 ? 'hover:border-blue-300 hover:bg-blue-50 cursor-pointer' : 'cursor-default'}`}
+                                >
+                                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><FileText size={16} /></div>
+                                  {latestHtmlMsg.fileName}
+                                </button>
+                              </div>
+                            )}
+                            {/* 点赞点踩 / 分享 / 重新生成 */}
+                            <div className="flex items-center gap-1 mt-2">
+                              <button
+                                onClick={() => setMsgVotes(prev => ({ ...prev, [msg.id]: prev[msg.id] === 'up' ? null : 'up' }))}
+                                className={`p-1.5 rounded-lg transition-colors ${msgVotes[msg.id] === 'up' ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                                title="点赞"
+                              ><ThumbsUp size={13} /></button>
+                              <button
+                                onClick={() => setMsgVotes(prev => ({ ...prev, [msg.id]: prev[msg.id] === 'down' ? null : 'down' }))}
+                                className={`p-1.5 rounded-lg transition-colors ${msgVotes[msg.id] === 'down' ? 'text-red-500 bg-red-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                                title="点踩"
+                              ><ThumbsDown size={13} /></button>
+                              <button
+                                onClick={handleChatShare}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+                                title="分享会话"
+                              ><Share2 size={13} /></button>
+                              <button
+                                onClick={() => {
+                                  // 找到这条 AI 消息之前最近的用户消息并重新发送
+                                  const idx = messages.findIndex(m => m.id === msg.id);
+                                  for (let i = idx - 1; i >= 0; i--) {
+                                    if (messages[i].role === 'user') {
+                                      handleSendMessage(messages[i].content);
+                                      break;
+                                    }
+                                  }
+                                }}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+                                title="重新生成"
+                              ><RotateCcw size={13} /></button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+
+                  <div className="px-6 pb-6 mt-auto">
+                    {renderInputBox()}
+                  </div>
+                </div>
+
+                {showRightPanel && <div className="bg-white flex flex-col h-full overflow-hidden">
+                  {/* 右侧顶部 tab 切换 */}
+                  <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-4 text-sm font-medium">
+                      <button
+                        onClick={() => { if (isLoading || htmlStage < 3) setRightTab('sync'); }}
+                        className={`pb-2 transition-colors ${htmlStage >= 3 && !isLoading ? 'text-gray-300 cursor-not-allowed' : rightTab === 'sync' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        title={htmlStage >= 3 && !isLoading ? '生成已完成，请在文件中查看' : ''}
+                      >
+                        实时同步
+                      </button>
+                      <button
+                        onClick={() => setRightTab('files')}
+                        className={`pb-2 transition-colors ${rightTab === 'files' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                      >
+                        文件
+                      </button>
+                    </div>
+                    <button onClick={() => setShowRightPanel(false)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+                  </div>
+
+                  {rightTab === 'sync' ? (
+                    <>
+                      {/* 实时同步：流式代码 + 完成后预览 */}
+                      <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-orange-50 text-orange-600">⋯</span>
+                          {latestHtmlMsg.fileName}
+                          <button onClick={toggleFavoriteReport} className={`transition-colors text-sm ${isReportFavorited ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'}`} title={isReportFavorited ? '取消收藏' : '收藏'}>★</button>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <button
+                            onClick={() => setActiveArtifact('html')}
+                            className={`px-3 py-1 rounded-full border transition-colors ${activeArtifact !== 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                          >
+                            代码
+                          </button>
+                          <button
+                            onClick={() => setActiveArtifact('preview')}
+                            className={`px-3 py-1 rounded-full border transition-colors ${activeArtifact === 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                          >
+                            预览
+                          </button>
+                          <div className="h-4 w-px bg-gray-200"></div>
+                          <button onClick={handleUndo} disabled={undoStack.length === 0} className={`p-1 rounded-md border transition-colors ${undoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="撤销"><Undo2 size={14} /></button>
+                          <button onClick={handleRedo} disabled={redoStack.length === 0} className={`p-1 rounded-md border transition-colors ${redoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="前进"><Redo2 size={14} /></button>
+                          <div className="h-4 w-px bg-gray-200"></div>
+                          <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">分享</button>
+                          <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">下载</button>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 overflow-hidden min-h-0">
+                        {activeArtifact === 'preview' ? (
+                          <div className="h-full flex flex-col overflow-hidden relative">
+                            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex-shrink-0">HTML 页面预览</div>
+                            <div className="flex-1 relative overflow-hidden">
+                              <iframe
+                                ref={previewIframeRef}
+                                title="html-preview"
+                                className="w-full h-full border-0"
+                                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                                src={`${publicBase}yuanqu/index.html`}
+                                onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
+                              />
+                              {/* 悬浮选择按钮 */}
+                              <button
+                                onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
+                                className={`absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
+                                title={selectionMode ? '退出选择' : '选择元素'}
+                              >
+                                <MousePointer2 size={18} />
+                              </button>
+                              {/* 选择模式遮罩提示 */}
+                              {selectionMode && !selectedElInfo && (
+                                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
+                                  点击报告中的元素进行选择
+                                </div>
+                              )}
+                              {/* 选中后的编辑弹窗 */}
+                              {selectedElInfo && (
+                                <div className="absolute bottom-16 right-4 z-30 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                                  <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                                    <div className="text-sm font-bold text-gray-800">编辑选中内容</div>
+                                    <button onClick={() => setSelectedElInfo(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                                  </div>
+                                  <div className="px-4 py-3">
+                                    <div className="bg-gray-50 rounded-xl px-3 py-2 mb-3 border border-gray-100">
+                                      <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">选中元素</div>
+                                      <div className="text-xs text-gray-700 truncate">{selectedElInfo.text || `<${selectedElInfo.tag}>`}</div>
+                                    </div>
+                                    <textarea
+                                      value={editInstruction}
+                                      onChange={(e) => setEditInstruction(e.target.value)}
+                                      placeholder="用自然语言描述你想要的修改，例如：把这个数字改成红色、放大标题、隐藏这个区域..."
+                                      className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
+                                      rows={3}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyEdit(); } }}
+                                    />
+                                  </div>
+                                  <div className="px-4 pb-3 flex justify-end gap-2">
+                                    <button onClick={() => setSelectedElInfo(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
+                                    <button
+                                      onClick={handleApplyEdit}
+                                      disabled={!editInstruction.trim() || isApplyingEdit}
+                                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                    >
+                                      {isApplyingEdit ? <><Loader2 size={12} className="animate-spin" /> 处理中...</> : <><Wand2 size={12} /> 应用修改</>}
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative h-full">
+                            <button
+                              onClick={() => {
+                                const code = (activeArtifact === 'sql' && streamedCodeById.sql) || (activeArtifact === 'python' && streamedCodeById.python) || (activeArtifact === 'html' && streamedCodeById.html) || '';
+                                handleCopyCode(code, `sync-${activeArtifact}`);
+                              }}
+                              className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
+                            >
+                              {copiedCodeId === `sync-${activeArtifact}` ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                            </button>
+                            <pre ref={codeScrollRef} className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
+                              {activeArtifact === 'sql' && htmlStage >= 1 && streamedCodeById.sql}
+                              {activeArtifact === 'python' && htmlStage >= 2 && streamedCodeById.python}
+                              {activeArtifact === 'html' && htmlStage >= 3 && streamedCodeById.html}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* 文件列表 */}
+                      {openedFile ? (
+                        <>
+                          <div className="px-6 py-3 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setOpenedFile(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><ArrowLeft size={16} /></button>
+                              <span className="text-sm font-medium text-gray-700">
+                                {openedFile === 'sql' && `${latestHtmlMsg.fileName.replace('.html', '')}.sql`}
+                                {openedFile === 'python' && `${latestHtmlMsg.fileName.replace('.html', '')}.py`}
+                                {(openedFile === 'html' || openedFile === 'html_preview') && latestHtmlMsg.fileName}
+                              </span>
+                              {(openedFile === 'html' || openedFile === 'html_preview') && (
+                                <button onClick={toggleFavoriteReport} className={`transition-colors ${isReportFavorited ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'}`} title={isReportFavorited ? '取消收藏' : '收藏'}><Sparkles size={14} /></button>
+                              )}
+                            </div>
+                            {(openedFile === 'html' || openedFile === 'html_preview') && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <button
+                                  onClick={() => setOpenedFile('html')}
+                                  className={`px-3 py-1 rounded-full border transition-colors ${openedFile === 'html' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                                >
+                                  代码
+                                </button>
+                                <button
+                                  onClick={() => setOpenedFile('html_preview')}
+                                  className={`px-3 py-1 rounded-full border transition-colors ${openedFile === 'html_preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                                >
+                                  预览
+                                </button>
+                                <div className="h-4 w-px bg-gray-200"></div>
+                                <button onClick={handleUndo} disabled={undoStack.length === 0} className={`p-1 rounded-md border transition-colors ${undoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="撤销"><Undo2 size={14} /></button>
+                                <button onClick={handleRedo} disabled={redoStack.length === 0} className={`p-1 rounded-md border transition-colors ${redoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="前进"><Redo2 size={14} /></button>
+                                <div className="h-4 w-px bg-gray-200"></div>
+                                <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">分享</button>
+                                <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">下载</button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 overflow-hidden min-h-0">
+                            {openedFile === 'html' ? (
+                              <div className="relative h-full">
+                                <button
+                                  onClick={() => handleCopyCode(streamedCodeById.html || latestHtmlMsg.code, 'file-html')}
+                                  className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
+                                >
+                                  {copiedCodeId === 'file-html' ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                                </button>
+                                <pre className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
+                                  {streamedCodeById.html || latestHtmlMsg.code}
+                                </pre>
+                              </div>
+                            ) : openedFile === 'html_preview' ? (
+                              <div className="relative w-full h-full">
+                                <iframe
+                                  ref={previewIframeRef}
+                                  title="html-preview-file"
+                                  className="w-full h-full border-0"
+                                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                                  src={`${publicBase}yuanqu/index.html`}
+                                  onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
+                                />
+                                {/* 悬浮选择按钮 */}
+                                <button
+                                  onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
+                                  className={`absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
+                                  title={selectionMode ? '退出选择' : '选择元素'}
+                                >
+                                  <MousePointer2 size={18} />
+                                </button>
+                                {selectionMode && !selectedElInfo && (
+                                  <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
+                                    点击报告中的元素进行选择
+                                  </div>
+                                )}
+                                {selectedElInfo && (
+                                  <div className="absolute bottom-16 right-4 z-30 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                                      <div className="text-sm font-bold text-gray-800">编辑选中内容</div>
+                                      <button onClick={() => setSelectedElInfo(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                                    </div>
+                                    <div className="px-4 py-3">
+                                      <div className="bg-gray-50 rounded-xl px-3 py-2 mb-3 border border-gray-100">
+                                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">选中元素</div>
+                                        <div className="text-xs text-gray-700 truncate">{selectedElInfo.text || `<${selectedElInfo.tag}>`}</div>
+                                      </div>
+                                      <textarea
+                                        value={editInstruction}
+                                        onChange={(e) => setEditInstruction(e.target.value)}
+                                        placeholder="用自然语言描述你想要的修改，例如：把这个数字改成红色、放大标题、隐藏这个区域..."
+                                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
+                                        rows={3}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyEdit(); } }}
+                                      />
+                                    </div>
+                                    <div className="px-4 pb-3 flex justify-end gap-2">
+                                      <button onClick={() => setSelectedElInfo(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
+                                      <button
+                                        onClick={handleApplyEdit}
+                                        disabled={!editInstruction.trim() || isApplyingEdit}
+                                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                      >
+                                        {isApplyingEdit ? <><Loader2 size={12} className="animate-spin" /> 处理中...</> : <><Wand2 size={12} /> 应用修改</>}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="relative h-full">
+                                <button
+                                  onClick={() => {
+                                    const code = (openedFile === 'sql' && (streamedCodeById.sql || latestHtmlMsg.sql)) || (openedFile === 'python' && (streamedCodeById.python || latestHtmlMsg.python)) || '';
+                                    handleCopyCode(code, `file-${openedFile}`);
+                                  }}
+                                  className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
+                                >
+                                  {copiedCodeId === `file-${openedFile}` ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                                </button>
+                                <pre className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
+                                  {openedFile === 'sql' && (streamedCodeById.sql || latestHtmlMsg.sql)}
+                                  {openedFile === 'python' && (streamedCodeById.python || latestHtmlMsg.python)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto p-6 space-y-2">
+                          <button
+                            onClick={() => htmlStage >= 1 && setOpenedFile('sql')}
+                            className={`w-full text-left border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors ${htmlStage >= 1 ? 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${htmlStage >= 1 ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-50 text-gray-300'}`}><Database size={16} /></div>
+                            <div>
+                              <div className="text-sm font-medium">{latestHtmlMsg.fileName.replace('.html', '')}.sql</div>
+                              <div className="text-xs text-gray-400 mt-0.5">SQL 查询文件</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => htmlStage >= 2 && setOpenedFile('python')}
+                            className={`w-full text-left border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors ${htmlStage >= 2 ? 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${htmlStage >= 2 ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-50 text-gray-300'}`}><Code size={16} /></div>
+                            <div>
+                              <div className="text-sm font-medium">{latestHtmlMsg.fileName.replace('.html', '')}.py</div>
+                              <div className="text-xs text-gray-400 mt-0.5">Python 数据处理</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => htmlStage >= 3 && setOpenedFile('html')}
+                            className={`w-full text-left border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors ${htmlStage >= 3 ? 'border-gray-200 hover:border-blue-300 hover:bg-blue-50 cursor-pointer' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${htmlStage >= 3 ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-300'}`}><FileText size={16} /></div>
+                            <div>
+                              <div className="text-sm font-medium">{latestHtmlMsg.fileName}</div>
+                              <div className="text-xs text-gray-400 mt-0.5">HTML 页面原型</div>
+                            </div>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>}
               </div>
             </div>
           ) : (
@@ -1279,7 +2911,7 @@ const HomeView = ({ onNavigate }) => {
         </div>
       </div>
 
-      {isChatting && (
+      {isChatting && !isHtmlWorkspace && (
         <div className="absolute bottom-0 w-full flex justify-center p-6 bg-gradient-to-t from-[#f4f6f8] via-[#f4f6f8]/95 to-transparent transition-all duration-500 z-20 pointer-events-none">
           <div className="w-full max-w-4xl relative pointer-events-auto">
             {renderInputBox()}
@@ -1298,6 +2930,80 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showQrCodeModal, setShowQrCodeModal] = useState(false);
+  const [favoriteReports, setFavoriteReports] = useState(() => {
+    const saved = window.localStorage.getItem('chatbi_favorite_reports');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const publicBase = import.meta.env.BASE_URL;
+
+  useEffect(() => {
+    window.localStorage.setItem('chatbi_favorite_reports', JSON.stringify(favoriteReports));
+  }, [favoriteReports]);
+
+  const [pendingRemoveReportId, setPendingRemoveReportId] = useState(null);
+  const [showManagerShareModal, setShowManagerShareModal] = useState(false);
+  const [managerShareCopied, setManagerShareCopied] = useState(false);
+  const [showManagerDownloadModal, setShowManagerDownloadModal] = useState(false);
+  const [htmlTemplates, setHtmlTemplates] = useState([
+    { id: 't1', name: '园区人流分析报告模版', creator: 'yuchen', createdAt: '2026-02-10 14:30' },
+    { id: 't2', name: '通信费用月度报告模版', creator: 'admin', createdAt: '2026-02-08 09:15' },
+    { id: 't3', name: '经营数据看板模版', creator: 'yuchen', createdAt: '2026-01-20 16:45' },
+  ]);
+  const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
+  const [editingTemplate, setEditingTemplate] = useState(null);
+  const [templateEditName, setTemplateEditName] = useState('');
+  const [favoriteSearchQuery, setFavoriteSearchQuery] = useState('');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [showAddTemplateModal, setShowAddTemplateModal] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateFile, setNewTemplateFile] = useState(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const addTemplateFileRef = useRef(null);
+
+  const handleAddTemplateFile = (file) => {
+    if (file && file.name.endsWith('.html')) {
+      setNewTemplateFile(file);
+    }
+  };
+
+  const handleAddTemplateConfirm = () => {
+    if (!newTemplateName.trim() || !newTemplateFile) return;
+    setHtmlTemplates(prev => [...prev, {
+      id: `t-${Date.now()}`,
+      name: newTemplateName.trim(),
+      creator: '当前用户',
+      createdAt: new Date().toLocaleString('zh-CN'),
+      file: newTemplateFile,
+    }]);
+    setShowAddTemplateModal(false);
+    setNewTemplateName('');
+    setNewTemplateFile(null);
+  };
+
+  const removeFavoriteReport = (reportId) => {
+    setFavoriteReports(prev => prev.filter(r => r.id !== reportId));
+    setPendingRemoveReportId(null);
+  };
+
+  const handleDownloadZipFromManager = async () => {
+    const baseUrl = `${publicBase}yuanqu/`;
+    try {
+      const JSZip = (await import('jszip')).default;
+      const { saveAs } = await import('file-saver');
+      const zip = new JSZip();
+      const files = ['index.html', 'styles.css', 'script.js'];
+      for (const f of files) {
+        const resp = await fetch(baseUrl + f);
+        const text = await resp.text();
+        zip.file(f, text);
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, '报告.zip');
+    } catch (e) {
+      console.error('Download failed:', e);
+    }
+  };
 
   const visibleNotifications = showAllNotifications ? announcements : announcements.slice(0, 3);
 
@@ -1315,7 +3021,9 @@ export default function App() {
     'agent-manage': '首页 > BI智能体 > 智能体管理',
     agents: '首页 > 智能体广场',
     'chat-agent-1': '首页 > 舆情分析助手',
-    'smart-builder': '首页 > 智能看板'
+    'smart-builder': '首页 > 智能看板',
+    'report-favorite': '首页 > 报告管理 > 报告收藏',
+    'html-template-manage': '首页 > 报告管理 > HTML模版管理'
   };
   const breadcrumbText = breadcrumbMap[currentView] || '首页';
 
@@ -1417,11 +3125,404 @@ export default function App() {
             <button onClick={() => setShowQrCodeModal(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><QrCode size={16} /><span className="hidden sm:inline">小程序体验</span></button>
           </div>
         </div>
-        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} />}
+        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} />}
         {currentView === 'agent-manage' && <AgentManageView />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
         {currentView === 'chat-agent-1' && <ChatAgentView onBack={goHome} />}
+        {currentView === 'report-favorite' && (
+          <div className="flex-1 overflow-y-auto p-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-500"><Sparkles size={20} /></div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">报告收藏</h2>
+                    <p className="text-sm text-gray-400">收藏的 HTML 报告在这里集中管理</p>
+                  </div>
+                </div>
+                {favoriteReports.length > 0 && (
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={favoriteSearchQuery}
+                      onChange={(e) => setFavoriteSearchQuery(e.target.value)}
+                      placeholder="搜索报告名称"
+                      className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-400"
+                    />
+                  </div>
+                )}
+              </div>
+              {favoriteReports.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+                  <Sparkles size={48} className="mb-4 text-gray-200" />
+                  <div className="text-base font-medium mb-1">暂无收藏报告</div>
+                  <div className="text-sm">生成报告后点击收藏按钮即可添加到这里</div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-500 text-xs bg-gray-50/50">
+                        <th className="text-left px-6 py-3 font-medium">报告名称</th>
+                        <th className="text-left px-4 py-3 font-medium">创建人</th>
+                        <th className="text-left px-4 py-3 font-medium">收藏时间</th>
+                        <th className="text-right px-6 py-3 font-medium">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {favoriteReports.filter(r => r.name.toLowerCase().includes(favoriteSearchQuery.toLowerCase())).map((report) => (
+                        <tr key={report.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0"><FileText size={13} /></div>
+                              <span className="font-medium text-gray-700 truncate max-w-[240px]">{report.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{report.creator}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">{report.createdAt}</td>
+                          <td className="px-6 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => window.open(`${window.location.origin}${publicBase}yuanqu/index.html`, '_blank')}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                title="查看"
+                              ><Globe size={14} /></button>
+                              <button
+                                onClick={() => setShowManagerDownloadModal(true)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="下载"
+                              ><Download size={14} /></button>
+                              <button
+                                onClick={() => { setShowManagerShareModal(true); setManagerShareCopied(false); }}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                                title="分享"
+                              ><Share2 size={14} /></button>
+                              <button
+                                onClick={() => setPendingRemoveReportId(report.id)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+                                title="取消收藏"
+                              ><StarOff size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {currentView === 'html-template-manage' && (
+          <div className="flex-1 overflow-y-auto p-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-500"><LayoutTemplate size={20} /></div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">HTML 模版管理</h2>
+                    <p className="text-sm text-gray-400">管理报告生成所使用的 HTML 模版</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={templateSearchQuery}
+                      onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                      placeholder="搜索模版名称"
+                      className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                    />
+                  </div>
+                  <button
+                    onClick={() => { setShowAddTemplateModal(true); setNewTemplateName(''); setNewTemplateFile(null); }}
+                    className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Plus size={16} /> 添加模版
+                  </button>
+                </div>
+              </div>
+              {htmlTemplates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+                  <LayoutTemplate size={48} className="mb-4 text-gray-200" />
+                  <div className="text-base font-medium mb-1">暂无模版</div>
+                  <div className="text-sm">添加 HTML 模版后将在这里展示</div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 text-gray-500 text-xs bg-gray-50/50">
+                        <th className="text-left px-6 py-3 font-medium">模版名称</th>
+                        <th className="text-left px-4 py-3 font-medium">创建人</th>
+                        <th className="text-left px-4 py-3 font-medium">创建时间</th>
+                        <th className="text-right px-6 py-3 font-medium">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {htmlTemplates.filter(t => t.name.toLowerCase().includes(templateSearchQuery.toLowerCase())).map((tpl) => (
+                        <tr key={tpl.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="px-6 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0"><LayoutTemplate size={13} /></div>
+                              <span className="font-medium text-gray-700 truncate max-w-[240px]">{tpl.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">{tpl.creator}</td>
+                          <td className="px-4 py-3 text-gray-400 text-xs">{tpl.createdAt}</td>
+                          <td className="px-6 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => { setEditingTemplate(tpl); setTemplateEditName(tpl.name); }}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                title="修改"
+                              ><Pencil size={14} /></button>
+                              <button
+                                onClick={() => window.open(`${window.location.origin}${publicBase}yuanqu/index.html`, '_blank')}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="查看"
+                              ><Eye size={14} /></button>
+                              <button
+                                onClick={() => handleDownloadZipFromManager()}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                title="下载"
+                              ><Download size={14} /></button>
+                              <button
+                                onClick={() => setPendingDeleteTemplateId(tpl.id)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                title="删除"
+                              ><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* 添加模版弹窗 */}
+      {showAddTemplateModal && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowAddTemplateModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[520px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Plus size={18} className="text-blue-600" /> 添加模版</h3>
+              <button onClick={() => setShowAddTemplateModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">模版名称</label>
+              <input
+                type="text"
+                value={newTemplateName}
+                onChange={(e) => setNewTemplateName(e.target.value)}
+                placeholder="请输入模版名称"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                autoFocus
+              />
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700">模版上传</label>
+                <a
+                  href={`${publicBase}yuanqu/index.html`}
+                  download="template.html"
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <Download size={12} /> 下载 HTML 模版示例
+                </a>
+              </div>
+
+              <input
+                ref={addTemplateFileRef}
+                type="file"
+                accept=".html"
+                className="hidden"
+                onChange={(e) => { if (e.target.files[0]) handleAddTemplateFile(e.target.files[0]); e.target.value = ''; }}
+              />
+
+              {newTemplateFile ? (
+                <div className="border border-blue-200 bg-blue-50 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 font-medium">
+                    <FileText size={16} className="text-blue-500" />
+                    {newTemplateFile.name}
+                    <span className="text-xs text-blue-400 font-normal">({(newTemplateFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button onClick={() => setNewTemplateFile(null)} className="text-blue-400 hover:text-blue-600"><X size={14} /></button>
+                </div>
+              ) : (
+                <div
+                  className={`border-2 border-dashed rounded-xl px-4 py-8 text-center cursor-pointer transition-colors ${isDraggingFile ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}
+                  onClick={() => addTemplateFileRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setIsDraggingFile(true); }}
+                  onDragLeave={() => setIsDraggingFile(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDraggingFile(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleAddTemplateFile(file);
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-2 text-gray-400">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDraggingFile ? 'bg-blue-100 text-blue-500' : 'bg-gray-100 text-gray-300'}`}>
+                      <FileText size={24} />
+                    </div>
+                    <div className="text-sm font-medium text-gray-500">点击或将文件拖拽到这里</div>
+                    <div className="text-xs text-gray-400">上传 HTML 文件（文件中可以包含 JS 和 CSS 代码）</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={() => setShowAddTemplateModal(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={handleAddTemplateConfirm}
+                disabled={!newTemplateName.trim() || !newTemplateFile}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <Plus size={14} /> 确认添加
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 模版修改弹窗 */}
+      {editingTemplate && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setEditingTemplate(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Pencil size={18} className="text-blue-600" /> 修改模版</h3>
+              <button onClick={() => setEditingTemplate(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="mb-5">
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">模版名称</label>
+              <input
+                type="text"
+                value={templateEditName}
+                onChange={(e) => setTemplateEditName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && templateEditName.trim()) { setHtmlTemplates(prev => prev.map(t => t.id === editingTemplate.id ? { ...t, name: templateEditName.trim() } : t)); setEditingTemplate(null); } }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setEditingTemplate(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={() => { if (templateEditName.trim()) { setHtmlTemplates(prev => prev.map(t => t.id === editingTemplate.id ? { ...t, name: templateEditName.trim() } : t)); setEditingTemplate(null); } }}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                确认修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 模版删除确认弹窗 */}
+      {pendingDeleteTemplateId && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setPendingDeleteTemplateId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"><Trash2 size={20} className="text-red-500" /></div>
+              <h3 className="text-lg font-bold text-gray-800">确认删除模版</h3>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-red-700 leading-relaxed">删除后该模版将永久移除，此操作不可撤销。</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setPendingDeleteTemplateId(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={() => { setHtmlTemplates(prev => prev.filter(t => t.id !== pendingDeleteTemplateId)); setPendingDeleteTemplateId(null); }}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showManagerShareModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setShowManagerShareModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Share2 size={18} className="text-blue-600" /> 创建分享链接</h3>
+              <button onClick={() => setShowManagerShareModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-amber-700 leading-relaxed">任何获得链接的人都可以查看你生成的报告内容，请检查是否包含敏感或隐私内容。</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-600 truncate select-all">
+                {`${window.location.origin}${publicBase}yuanqu/index.html`}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}${publicBase}yuanqu/index.html`);
+                  setManagerShareCopied(true);
+                  setTimeout(() => setManagerShareCopied(false), 2000);
+                }}
+                className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${managerShareCopied ? 'bg-emerald-500 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              >
+                {managerShareCopied ? '已复制' : '复制链接'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showManagerDownloadModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40" onClick={() => setShowManagerDownloadModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[420px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Download size={18} className="text-blue-600" /> 下载报告文件</h3>
+              <button onClick={() => setShowManagerDownloadModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">将下载以下文件的压缩包：</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5 space-y-1.5">
+              <div className="flex items-center gap-2 text-sm text-gray-700"><FileText size={14} className="text-blue-500" /> index.html</div>
+              <div className="flex items-center gap-2 text-sm text-gray-700"><Code size={14} className="text-yellow-500" /> styles.css</div>
+              <div className="flex items-center gap-2 text-sm text-gray-700"><Code size={14} className="text-emerald-500" /> script.js</div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowManagerDownloadModal(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={() => { setShowManagerDownloadModal(false); handleDownloadZipFromManager(); }}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                确认下载
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingRemoveReportId && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setPendingRemoveReportId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"><StarOff size={20} className="text-red-500" /></div>
+              <h3 className="text-lg font-bold text-gray-800">确认取消收藏</h3>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-red-700 leading-relaxed">取消收藏后该报告将从收藏列表中移除，此操作不可撤销。</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setPendingRemoveReportId(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button onClick={() => removeFavoriteReport(pendingRemoveReportId)} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors">确认取消收藏</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
