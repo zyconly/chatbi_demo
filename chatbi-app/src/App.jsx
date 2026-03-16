@@ -594,6 +594,12 @@ const suggestionsMap = {
     { title: '投诉分析看板', query: '生成客户投诉数据分析可视化页面', files: [{ name: '投诉记录_2025.csv', size: '102k' }], template: '运营看板' },
     { title: '套餐对比页面', query: '生成各类套餐使用情况对比分析页面', files: [{ name: '套餐明细数据.csv', size: '19.5MB' }], template: '用户分析' },
   ],
+  board: [
+    { title: '经营分析看板', query: '帮我生成一个经营分析的看板并对时间进行过滤查询', files: [{ name: '经营数据汇总.xlsx', size: '18.5MB' }] },
+    { title: '宽带业务看板', query: '生成一个宽带业务看板', files: [{ name: '宽带业务数据.csv', size: '12.3MB' }] },
+    { title: '营业厅业绩看板', query: '生成各属地营业厅业绩看板', files: [{ name: '营业厅业绩表.xlsx', size: '15.6MB' }] },
+    { title: '区域对比看板', query: '生成各区域新增业务对比看板', files: [{ name: '区域业务数据.csv', size: '9.8MB' }] },
+  ],
 };
 
 const announcements = [
@@ -650,6 +656,79 @@ const datasetFields = {
 const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
   return new Promise((resolve) => {
     setTimeout(() => {
+      if (mode === 'board') {
+        const q = query.toLowerCase();
+        const isRemove = q.includes('删除') || q.includes('去掉') || q.includes('移除') || q.includes('取消');
+        const isAdd = q.includes('增加') || q.includes('添加') || q.includes('加上') || q.includes('加个');
+        const isFilterOp = q.includes('过滤') || q.includes('筛选');
+
+        // Column keyword mapping — all possible columns
+        const colKeywords = [
+          { key: 'date', kw: ['日期', '时间'] }, { key: 'area', kw: ['属地', '地区', '城市'] },
+          { key: 'district', kw: ['���县', '区', '县'] }, { key: 'street', kw: ['街道', '乡镇'] },
+          { key: 'grid', kw: ['网格'] }, { key: 'hall', kw: ['营业厅'] },
+          { key: 'newCount', kw: ['新增办理量', '新增办理', '新增量'] }, { key: 'newRevenue', kw: ['新增收入'] },
+          { key: 'broadbandCount', kw: ['宽带办理量', '宽带办理', '宽带量'] }, { key: 'broadbandRevenue', kw: ['宽带收入'] },
+          { key: 'profit', kw: ['利润'] }, { key: 'profitRate', kw: ['利润率'] },
+          { key: 'userCount', kw: ['用户数', '用户量'] }, { key: 'churnRate', kw: ['流失率'] }, { key: 'satisfaction', kw: ['满意度'] },
+        ];
+        const matchedCols = colKeywords.filter(c => c.kw.some(kw => q.includes(kw)));
+
+        // Filter definitions for filter bar
+        const filterDefs = [
+          { type: 'date', keywords: ['日期', '时间', '日期过滤', '时间过滤', '日期筛选', '时间筛选'], label: '日期筛选' },
+          { type: 'area', keywords: ['属地', '地区', '区域', '城市'], label: '属地筛选' },
+          { type: 'district', keywords: ['区县'], label: '区县筛选' },
+          { type: 'grid', keywords: ['网格'], label: '网格筛选' },
+          { type: 'hall', keywords: ['营业厅'], label: '营业厅筛选' },
+        ];
+
+        // --- Remove columns or filters ---
+        if (isRemove && matchedCols.length > 0 && !isFilterOp) {
+          const names = matchedCols.map(c => BOARD_ALL_COLUMNS[c.key]?.label || c.key);
+          resolve({ type: 'board_column_change', action: 'remove', columns: matchedCols.map(c => c.key), text: `好的，已为您移除${names.map(n => `「${n}」`).join('、')}列。` });
+          return;
+        }
+        if (isRemove && isFilterOp) {
+          const matched = filterDefs.find(f => f.keywords.some(kw => q.includes(kw)));
+          if (matched) {
+            resolve({ type: 'board_filter_change', action: 'remove', filterType: matched.type, text: `好的，已为您移除「${matched.label}」条件。` });
+          } else {
+            resolve({ type: 'board_filter_change', action: 'remove_all', text: '好的，已为您清除所有筛选条件。' });
+          }
+          return;
+        }
+        if (isRemove) {
+          const matched = filterDefs.find(f => f.keywords.some(kw => q.includes(kw)));
+          if (matched) { resolve({ type: 'board_filter_change', action: 'remove', filterType: matched.type, text: `好的，已为您移除「${matched.label}」条件。` }); return; }
+          resolve({ type: 'board_filter_change', action: 'remove_all', text: '好的，已为您清除所有筛选条件。' }); return;
+        }
+
+        // --- Add columns or filters ---
+        if (isAdd && matchedCols.length > 0 && !isFilterOp && !q.includes('看板')) {
+          const names = matchedCols.map(c => BOARD_ALL_COLUMNS[c.key]?.label || c.key);
+          resolve({ type: 'board_column_change', action: 'add', columns: matchedCols.map(c => c.key), text: `好的，已为您添加${names.map(n => `「${n}」`).join('、')}列。看板已更新。` });
+          return;
+        }
+        if ((isAdd || isFilterOp) && !q.includes('看板')) {
+          const matchedFilters = filterDefs.filter(f => f.keywords.some(kw => q.includes(kw)));
+          if (matchedFilters.length > 0) {
+            resolve({ type: 'board_filter_change', action: 'add', filters: matchedFilters.map(m => ({ type: m.type, label: m.label })), text: `好的，已为您添加${matchedFilters.map(m => `「${m.label}」`).join('、')}条件。看板已更新。` });
+            return;
+          }
+        }
+
+        // --- Default: generate dashboard ---
+        const title = query.includes('经营') ? '经营分析看板' : query.includes('宽带') ? '宽带业务看板' : query.includes('营业厅') ? '营业厅业绩看板' : query.slice(0, 10) + '看板';
+        const initFilters = filterDefs.filter(f => f.keywords.some(kw => q.includes(kw))).map(f => ({ type: f.type, label: f.label }));
+        resolve({
+          type: 'board_dashboard',
+          title,
+          initFilters,
+          text: `好的，我已根据您的需求生成了「${title}」。看板包含${initFilters.length > 0 ? initFilters.map(f => f.label).join('、') : '日期过滤器'}和详细数据表格，涵盖新增业务和宽带业务的办理量与收入数据。您可以通过对话添加或删除列与筛选条件，也可以右键点击维度列进行下钻。`,
+        });
+        return;
+      }
       if (mode === 'html') {
         const safeTitle = templateTitle || query.trim() || '页面原型';
         const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
@@ -1003,100 +1082,87 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
   );
 };
 
-const SmartBuilderView = ({ onBack }) => {
-  const [activeChart, setActiveChart] = useState(null);
-  const [selectedFields, setSelectedFields] = useState(['m1', 'm2', 'd5']);
-
-  const toggleField = (fieldId) => {
-    if (selectedFields.includes(fieldId)) {
-      setSelectedFields(selectedFields.filter(id => id !== fieldId));
-    } else {
-      setSelectedFields([...selectedFields, fieldId]);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-gray-50 text-gray-800">
-      <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm z-20">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-800 font-medium"><ArrowLeft size={18} /></button>
-          <div className="h-5 w-px bg-gray-200"></div>
-          <h2 className="text-sm font-bold text-gray-800">年度销售数据集的分析报表</h2>
-        </div>
-      </div>
-
-      <div className="flex-1 flex overflow-hidden">
-        {/* 数据字段侧边栏 */}
-        <div className="w-60 bg-white border-r border-gray-200 flex flex-col z-10 flex-shrink-0">
-           <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <span className="text-xs font-bold text-gray-700">数据字段</span>
-           </div>
-           <div className="flex-1 overflow-y-auto p-2">
-              <div className="mb-4">
-                 <div className="text-[10px] text-gray-400 font-bold mb-2 uppercase px-2">维度 (Dimensions)</div>
-                 {datasetFields.dimensions.map(field => (
-                    <div key={field.id} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 text-xs group ${selectedFields.includes(field.id) ? 'bg-blue-50 text-blue-600' : 'text-gray-600'}`} onClick={() => toggleField(field.id)}>
-                       <span className="text-gray-400">{field.type === 'date' ? <Calendar size={12} /> : <TextIcon size={12} />}</span>
-                       <span className="flex-1">{field.name}</span>
-                       <div className="opacity-0 group-hover:opacity-100 text-gray-400">{selectedFields.includes(field.id) ? <CheckSquare size={12} className="text-blue-500" /> : <Square size={12} />}</div>
-                    </div>
-                 ))}
-              </div>
-              <div>
-                 <div className="text-[10px] text-gray-400 font-bold mb-2 uppercase px-2">指标 (Metrics)</div>
-                 {datasetFields.metrics.map(field => (
-                    <div key={field.id} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-gray-100 text-xs group ${selectedFields.includes(field.id) ? 'bg-green-50 text-green-600' : 'text-gray-600'}`} onClick={() => toggleField(field.id)}>
-                       <span className="text-green-500 font-bold text-[10px]">#</span>
-                       <span className="flex-1">{field.name}</span>
-                       <div className="opacity-0 group-hover:opacity-100 text-gray-400">{selectedFields.includes(field.id) ? <CheckSquare size={12} className="text-green-500" /> : <Square size={12} />}</div>
-                    </div>
-                 ))}
-              </div>
-           </div>
-        </div>
-
-        {/* 画布区域 */}
-        <div className="flex-1 bg-gray-100 p-6 overflow-y-auto custom-scrollbar flex justify-center" onClick={() => setActiveChart(null)}>
-          <div className="w-full max-w-[1000px] bg-white shadow-sm border border-gray-200 min-h-[800px] relative p-6 transition-all" onClick={(e) => e.stopPropagation()}>
-             <div className="text-center mb-6"><h1 className="text-2xl font-bold text-gray-800">年度销售报表</h1></div>
-             <div className="grid grid-cols-4 gap-4 mb-6">
-                {[{ label: '总金额', value: '1515万', color: 'border-l-4 border-blue-500' }, { label: '数量', value: '21.8万', color: 'border-l-4 border-green-500' }].map((kpi, idx) => (
-                  <div key={idx} className={`bg-white p-4 shadow-sm border border-gray-100 rounded ${kpi.color}`}><div className="text-xs text-gray-500 mb-1">{kpi.label}</div><div className="text-xl font-bold text-gray-800">{kpi.value}</div></div>
-                ))}
-             </div>
-             {/* 占位图表 */}
-             <div className={`bg-white border border-gray-100 shadow-sm rounded p-4 mb-4 h-64 relative cursor-pointer ${activeChart === 'line-chart' ? 'chart-selected' : ''}`} onClick={(e) => { e.stopPropagation(); setActiveChart('line-chart'); }}>
-                <div className="text-xs font-bold text-center">趋势图 (点击选中)</div>
-                <div className="w-full h-full flex items-end justify-between px-4 pb-4 pt-8 gap-1">{Array.from({ length: 10 }).map((_, i) => (<div key={i} className="w-full bg-blue-50/30 rounded-t relative"><div className="absolute bottom-0 w-full bg-blue-400/50" style={{ height: `${30 + Math.random() * 50}%` }}></div></div>))}</div>
-             </div>
-          </div>
-        </div>
-
-        {/* Copilot 侧边栏 */}
-        <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-xl z-20 flex-shrink-0">
-           <div className="h-12 border-b border-gray-100 flex items-center justify-between px-4 bg-gradient-to-r from-blue-50 to-purple-50">
-              <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-600 rounded-lg flex items-center justify-center text-white"><Sparkles size={14} /></div><span className="text-sm font-bold text-gray-800">BI Copilot</span></div>
-           </div>
-           <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-              {activeChart ? (
-                 <div className="mb-4">
-                    <div className="flex items-center gap-2 mb-2"><Lightbulb size={14} className="text-orange-500" /><span className="text-xs font-bold text-gray-700">针对选中图表</span></div>
-                    <div className="flex flex-col gap-2">
-                       <button className="text-xs flex items-center gap-2 p-2.5 rounded-lg bg-white border border-gray-200 hover:border-blue-400 text-gray-600 text-left">切换为堆积柱状图</button>
-                    </div>
-                 </div>
-              ) : (
-                 <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-2"><Bot size={14} className="text-blue-600" /><span className="text-xs font-bold text-gray-700">当前仪表板分析</span></div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600">Copilot 已基于当前数据为您生成初步洞察。</div>
-                 </div>
-              )}
-           </div>
-        </div>
-      </div>
-    </div>
-  );
+// Hierarchical location data for drill-down
+const LOCATION_HIERARCHY = {
+  '南京': { districts: ['玄武区', '鼓楼区', '建邺区', '秦淮区', '栖霞区'], grids: ['玄武网格', '鼓楼网格', '建邺网格'], halls: ['新街口营业厅', '河西营业厅', '仙林营业厅'] },
+  '苏州': { districts: ['姑苏区', '吴中区', '工业园区', '虎丘区', '相城区'], grids: ['姑苏网格', '吴中网格', '工业园网格'], halls: ['观前街营业厅', '吴中营业厅', '园区营业厅'] },
+  '无锡': { districts: ['梁溪区', '锡山区', '滨湖区', '惠山区', '新吴区'], grids: ['梁溪网格', '锡山网格', '滨湖网格'], halls: ['中山路营业厅', '锡山营业厅', '滨湖营业厅'] },
+  '常州': { districts: ['天宁区', '钟楼区', '新北区', '武进区'], grids: ['天宁网格', '钟楼网格'], halls: ['南大街营业厅', '钟楼营业厅'] },
+  '南通': { districts: ['崇川区', '通州区', '海门区', '如皋市'], grids: ['崇川网格', '通州网格'], halls: ['崇川营业厅', '通州营业厅'] },
 };
+
+const DISTRICT_STREETS = {
+  '玄武区': ['梅园新村街道', '孝陵卫街道', '玄武门街道'], '鼓楼区': ['宁海路街道', '华侨路街道', '湖南路街道'], '建邺区': ['沙洲街道', '双闸街道', '江心洲街道'],
+  '秦淮区': ['夫子庙街道', '朝天宫街道', '大光路街道'], '栖霞区': ['仙林街道', '马群街道', '尧化街道'],
+  '姑苏区': ['平江街道', '��阊街道', '沧浪街道'], '吴中区': ['木渎镇', '甪直镇', '胥口镇'], '工业园区': ['娄葑街道', '斜塘街道', '唯亭街道'],
+  '虎丘区': ['狮山街道', '枫桥街道'], '相城区': ['元和街道', '太平街道'],
+  '梁溪区': ['崇安寺街道', '通江街道', '广瑞路街道'], '锡山区': ['东亭街道', '安镇街道'], '滨湖区': ['河埒街道', '荣巷街道', '蠡湖街道'],
+  '惠山区': ['堰桥街道', '长安街道'], '新吴区': ['旺庄街道', '硕放街道'],
+  '天宁区': ['雕庄街道', '青龙街道'], '钟楼区': ['北港街道', '西林街道'], '新北区': ['河海街道', '三井街道'], '武进区': ['湖塘镇', '牛塘镇'],
+  '崇川区': ['城东街道', '和平桥街道'], '通州区': ['金沙街道', '兴仁镇'], '海门区': ['海门街道', '三厂街道'], '如皋市': ['如城街道', '白蒲镇'],
+};
+
+// All possible columns definition
+const BOARD_ALL_COLUMNS = {
+  // Dimensions
+  date:     { key: 'date', label: '日期', group: 'dim', isDim: true },
+  area:     { key: 'area', label: '属地', group: 'dim', isDim: true, drillChildren: ['district'] },
+  district: { key: 'district', label: '区县', group: 'dim', isDim: true, drillChildren: ['street'], drillParent: 'area' },
+  street:   { key: 'street', label: '街道', group: 'dim', isDim: true, drillParent: 'district' },
+  grid:     { key: 'grid', label: '网格', group: 'dim', isDim: true },
+  hall:     { key: 'hall', label: '营业厅', group: 'dim', isDim: true },
+  // Metrics — grouped
+  newCount:          { key: 'newCount', label: '新增办理量', group: '新增业务', groupColor: 'blue' },
+  newRevenue:        { key: 'newRevenue', label: '新增收入', group: '新增业务', groupColor: 'blue', format: 'money' },
+  broadbandCount:    { key: 'broadbandCount', label: '宽带办理量', group: '宽带业务', groupColor: 'emerald' },
+  broadbandRevenue:  { key: 'broadbandRevenue', label: '宽带收入', group: '宽带业务', groupColor: 'emerald', format: 'money' },
+  // Extra metrics available for adding
+  profit:            { key: 'profit', label: '利润', group: '利润指标', groupColor: 'orange', format: 'money' },
+  profitRate:        { key: 'profitRate', label: '利润率', group: '利润指标', groupColor: 'orange', format: 'percent' },
+  userCount:         { key: 'userCount', label: '用户数', group: '用户指标', groupColor: 'purple' },
+  churnRate:         { key: 'churnRate', label: '流失率', group: '用户指标', groupColor: 'purple', format: 'percent' },
+  satisfaction:      { key: 'satisfaction', label: '满意度', group: '用户指标', groupColor: 'purple', format: 'percent' },
+};
+
+const BOARD_DEFAULT_COLUMNS = ['date', 'area', 'grid', 'hall', 'newCount', 'newRevenue', 'broadbandCount', 'broadbandRevenue'];
+
+const DASHBOARD_MOCK_DATA = (() => {
+  const areas = Object.keys(LOCATION_HIERARCHY);
+  const rows = [];
+  for (let m = 1; m <= 3; m++) {
+    for (let d = 1; d <= 10; d++) {
+      const area = areas[(m * 3 + d) % areas.length];
+      const loc = LOCATION_HIERARCHY[area];
+      const gi = (d + m) % loc.grids.length;
+      const hi = (d + m) % loc.halls.length;
+      const di = (d + m) % loc.districts.length;
+      const district = loc.districts[di];
+      const streets = DISTRICT_STREETS[district] || ['未知街道'];
+      const si = (d + m * 2) % streets.length;
+      const date = `2025-${String(m).padStart(2, '0')}-${String(d * 3 > 28 ? 28 : d * 3).padStart(2, '0')}`;
+      rows.push({
+        date,
+        area,
+        district,
+        street: streets[si],
+        grid: loc.grids[gi],
+        hall: loc.halls[hi],
+        newCount: Math.floor(50 + Math.random() * 200),
+        newRevenue: Math.floor(2000 + Math.random() * 8000),
+        broadbandCount: Math.floor(10 + Math.random() * 80),
+        broadbandRevenue: Math.floor(1000 + Math.random() * 5000),
+        profit: Math.floor(500 + Math.random() * 3000),
+        profitRate: Math.floor(10 + Math.random() * 40),
+        userCount: Math.floor(100 + Math.random() * 500),
+        churnRate: +(1 + Math.random() * 8).toFixed(1),
+        satisfaction: Math.floor(75 + Math.random() * 25),
+      });
+    }
+  }
+  return rows;
+})();
+
+// SmartBuilderView removed — board mode is now handled inline in HomeView
 
 const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, setFavoriteReports, agentInfo }) => (
   <HomeView
@@ -1248,7 +1314,12 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [isLoading, setIsLoading] = useState(false);
   const [analysisMode, setAnalysisMode] = useState('fast');
   const [generationType, setGenerationTypeRaw] = useState('qa');
-  const setGenerationType = (val) => { setGenerationTypeRaw(val); onGenTypeChange?.(val); };
+  const setGenerationType = (val) => {
+    setGenerationTypeRaw(val);
+    onGenTypeChange?.(val);
+    // Reset board state when switching away
+    if (val !== 'board') { setBoardDashboardVisible(false); setBoardStreamingMsgId(null); setBoardSteps([]); setBoardStreamingText(''); setBoardFilters([]); setBoardColumns(BOARD_DEFAULT_COLUMNS); setBoardContextMenu(null); }
+  };
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [showDatasetModal, setShowDatasetModal] = useState(false);
   const [expandedThinking, setExpandedThinking] = useState(null);
@@ -1289,6 +1360,18 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [selectedElInfo, setSelectedElInfo] = useState(null); // { tag, text, rect, path }
   const [editInstruction, setEditInstruction] = useState('');
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
+  // Board (智能看板) state
+  const [boardDashboardVisible, setBoardDashboardVisible] = useState(false);
+  const [boardTitle, setBoardTitle] = useState('');
+  const [boardStreamingText, setBoardStreamingText] = useState('');
+  const [boardStreamingMsgId, setBoardStreamingMsgId] = useState(null);
+  const [boardSteps, setBoardSteps] = useState([]);
+  // Dynamic filters: [{ id, type: 'date'|'area'|'grid'|'hall', label, values: {start,end} | Set }]
+  const [boardFilters, setBoardFilters] = useState([]);
+  // Dynamic table columns (ordered list of column keys)
+  const [boardColumns, setBoardColumns] = useState(BOARD_DEFAULT_COLUMNS);
+  // Right-click drill-down context menu
+  const [boardContextMenu, setBoardContextMenu] = useState(null); // { x, y, colKey, cellValue }
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
@@ -1313,7 +1396,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
     { id: 'brief', label: '通报仿写', icon: FileTextIcon, action: () => { setGenerationType('brief'); setShowAllSuggestions(false); } },
     { id: 'explore', label: '探索分析', icon: PieChart, action: () => { setGenerationType('explore'); setShowAllSuggestions(false); }, iconClass: 'text-orange-500' },
     { id: 'html', label: 'HTML页面生成', icon: Code, action: () => { setGenerationType('html'); setShowAllSuggestions(false); }, iconClass: 'text-indigo-500' },
-    { id: 'board', label: '智能看板', icon: Layout, action: () => onNavigate('smart-builder'), iconClass: 'text-blue-500' }
+    { id: 'board', label: '智能看板', icon: Layout, action: () => { setGenerationType('board'); setShowAllSuggestions(false); }, iconClass: 'text-blue-500' }
   ];
   const appMap = Object.fromEntries(appButtons.map((app) => [app.id, app]));
   const primaryApps = preferredAppIds.map((id) => appMap[id]).filter(Boolean).slice(0, 5);
@@ -1781,6 +1864,128 @@ ${messages.map(msg => {
     const templateTitle = htmlTemplates.find(t => t.id === selectedTemplateId)?.title || '';
     const responseData = await simulateAIResponse(text, generationType, templateTitle);
 
+    if (generationType === 'board' && (responseData.type === 'board_dashboard' || responseData.type === 'board_filter_change' || responseData.type === 'board_column_change')) {
+      const aiMsgId = Date.now() + 1;
+      setBoardStreamingMsgId(aiMsgId);
+      setBoardStreamingText('');
+      setBoardSteps([]);
+      const fullReply = responseData.text;
+
+      if (responseData.type === 'board_column_change') {
+        // Column add/remove
+        const stepTexts = ['正在分析需求...', '正在调整表格结构...', '看板已更新'];
+        let charIdx = 0;
+        const streamTimer = setInterval(() => {
+          charIdx += 1;
+          setBoardStreamingText(fullReply.slice(0, charIdx));
+          if (charIdx >= fullReply.length) clearInterval(streamTimer);
+        }, 18);
+
+        setTimeout(() => setBoardSteps([stepTexts[0]]), 200);
+        setTimeout(() => {
+          setBoardSteps([stepTexts[0], stepTexts[1]]);
+          if (responseData.action === 'add') {
+            setBoardColumns(prev => {
+              const cols = [...prev];
+              for (const key of responseData.columns) {
+                if (!cols.includes(key) && BOARD_ALL_COLUMNS[key]) {
+                  // Insert dimensions before metrics, metrics at end
+                  if (BOARD_ALL_COLUMNS[key].isDim) {
+                    const lastDimIdx = cols.reduce((acc, c, i) => BOARD_ALL_COLUMNS[c]?.isDim ? i : acc, -1);
+                    cols.splice(lastDimIdx + 1, 0, key);
+                  } else {
+                    cols.push(key);
+                  }
+                }
+              }
+              return cols;
+            });
+          } else if (responseData.action === 'remove') {
+            setBoardColumns(prev => prev.filter(c => !responseData.columns.includes(c)));
+          }
+        }, 800);
+        setTimeout(() => setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2]]), 1400);
+        setTimeout(() => {
+          clearInterval(streamTimer);
+          setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: fullReply, type: 'board_column_change' }]);
+          setBoardStreamingMsgId(null);
+          setBoardStreamingText('');
+          setBoardSteps([]);
+          setIsLoading(false);
+        }, 2000);
+      } else if (responseData.type === 'board_filter_change') {
+        // Filter modification: shorter streaming, update filters
+        const stepTexts = ['正在分析需求...', '正在更新筛选条件...', '看板已更新'];
+        let charIdx = 0;
+        const streamTimer = setInterval(() => {
+          charIdx += 1;
+          setBoardStreamingText(fullReply.slice(0, charIdx));
+          if (charIdx >= fullReply.length) clearInterval(streamTimer);
+        }, 18);
+
+        setTimeout(() => setBoardSteps([stepTexts[0]]), 200);
+        setTimeout(() => {
+          setBoardSteps([stepTexts[0], stepTexts[1]]);
+          // Apply filter changes
+          if (responseData.action === 'add') {
+            setBoardFilters(prev => {
+              const newFilters = [...prev];
+              for (const f of responseData.filters) {
+                if (!newFilters.some(ef => ef.type === f.type)) {
+                  newFilters.push({ id: Date.now() + '_' + f.type, type: f.type, label: f.label, value: f.type === 'date' ? { start: '', end: '' } : '' });
+                }
+              }
+              return newFilters;
+            });
+          } else if (responseData.action === 'remove') {
+            setBoardFilters(prev => prev.filter(f => f.type !== responseData.filterType));
+          } else if (responseData.action === 'remove_all') {
+            setBoardFilters([]);
+          }
+        }, 800);
+        setTimeout(() => setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2]]), 1400);
+        setTimeout(() => {
+          clearInterval(streamTimer);
+          setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: fullReply, type: 'board_filter_change' }]);
+          setBoardStreamingMsgId(null);
+          setBoardStreamingText('');
+          setBoardSteps([]);
+          setIsLoading(false);
+        }, 2000);
+      } else {
+        // Initial dashboard generation
+        const stepTexts = ['正在分析需求...', '正在生成看板组件...', '看板已生成，请在右侧查看'];
+        let charIdx = 0;
+        const streamTimer = setInterval(() => {
+          charIdx += 1;
+          setBoardStreamingText(fullReply.slice(0, charIdx));
+          if (charIdx >= fullReply.length) clearInterval(streamTimer);
+        }, 18);
+
+        setTimeout(() => setBoardSteps([stepTexts[0]]), 300);
+        setTimeout(() => setBoardSteps([stepTexts[0], stepTexts[1]]), 1200);
+        setTimeout(() => {
+          setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2]]);
+          setBoardDashboardVisible(true);
+          setBoardTitle(responseData.title);
+          // Set initial filters from AI response
+          const initFilters = (responseData.initFilters || [{ type: 'date', label: '日期筛选' }]).map(f => ({
+            id: Date.now() + '_' + f.type, type: f.type, label: f.label, value: f.type === 'date' ? { start: '', end: '' } : ''
+          }));
+          setBoardFilters(initFilters);
+        }, 2200);
+        setTimeout(() => {
+          clearInterval(streamTimer);
+          setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: fullReply, type: 'board_dashboard' }]);
+          setBoardStreamingMsgId(null);
+          setBoardStreamingText('');
+          setBoardSteps([]);
+          setIsLoading(false);
+        }, 3200);
+      }
+      return;
+    }
+
     setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', ...responseData }]);
     setIsLoading(false);
     setActiveArtifact('sql');
@@ -2166,6 +2371,61 @@ ${messages.map(msg => {
 
   const isChatting = messages.length > 0;
   const isHtmlWorkspace = generationType === 'html' && Boolean(latestHtmlMsg);
+  const isBoardWorkspace = generationType === 'board' && (boardDashboardVisible || boardStreamingMsgId);
+
+  const boardFilteredData = DASHBOARD_MOCK_DATA.filter(row => {
+    for (const f of boardFilters) {
+      if (f.type === 'date' && f.value) {
+        if (f.value.start && row.date < f.value.start) return false;
+        if (f.value.end && row.date > f.value.end) return false;
+      }
+      if (f.type === 'area' && f.value && row.area !== f.value) return false;
+      if (f.type === 'district' && f.value && row.district !== f.value) return false;
+      if (f.type === 'grid' && f.value && row.grid !== f.value) return false;
+      if (f.type === 'hall' && f.value && row.hall !== f.value) return false;
+    }
+    return true;
+  });
+
+  // Extract unique values for dropdown filters
+  const boardUniqueAreas = [...new Set(DASHBOARD_MOCK_DATA.map(r => r.area))];
+  const boardUniqueDistricts = [...new Set(DASHBOARD_MOCK_DATA.map(r => r.district))];
+  const boardUniqueGrids = [...new Set(DASHBOARD_MOCK_DATA.map(r => r.grid))];
+  const boardUniqueHalls = [...new Set(DASHBOARD_MOCK_DATA.map(r => r.hall))];
+
+  const updateBoardFilter = (filterId, newValue) => {
+    setBoardFilters(prev => prev.map(f => f.id === filterId ? { ...f, value: newValue } : f));
+  };
+
+  const removeBoardFilter = (filterId) => {
+    setBoardFilters(prev => prev.filter(f => f.id !== filterId));
+  };
+
+  // Drill-down handler: insert child column after parent
+  const handleBoardDrill = (parentKey, childKey) => {
+    setBoardColumns(prev => {
+      if (prev.includes(childKey)) return prev; // already there
+      const idx = prev.indexOf(parentKey);
+      const newCols = [...prev];
+      newCols.splice(idx + 1, 0, childKey);
+      return newCols;
+    });
+    setBoardContextMenu(null);
+  };
+
+  // Compute dynamic metric groups for merged headers
+  const boardDimCols = boardColumns.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
+  const boardMetricCols = boardColumns.filter(k => !BOARD_ALL_COLUMNS[k]?.isDim);
+  const boardMetricGroups = [];
+  for (const mk of boardMetricCols) {
+    const def = BOARD_ALL_COLUMNS[mk];
+    const last = boardMetricGroups[boardMetricGroups.length - 1];
+    if (last && last.group === def.group) {
+      last.cols.push(mk);
+    } else {
+      boardMetricGroups.push({ group: def.group, color: def.groupColor || 'gray', cols: [mk] });
+    }
+  }
 
   return (
     <div className={`flex h-full justify-center overflow-hidden transition-colors duration-500 ${isChatting ? 'bg-[#f4f6f8]' : 'bg-white'}`}>
@@ -3008,6 +3268,218 @@ ${messages.map(msg => {
                 </div>}
               </div>
             </div>
+          ) : isBoardWorkspace ? (
+            <div className="w-full max-w-none mx-auto flex-1 min-h-0">
+              <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${boardDashboardVisible ? 'grid-cols-1 lg:grid-cols-[44%_56%]' : 'grid-cols-1'}`}>
+                {/* Left: Chat Panel */}
+                <div className="border-r border-gray-200 bg-white flex flex-col h-full min-h-0 overflow-hidden">
+                  <div ref={leftChatRef} className="px-6 pb-4 pt-4 flex-1 space-y-4 overflow-y-auto min-h-0">
+                    {messages.map(msg => msg.role === 'user' ? (
+                      <div key={msg.id} className="flex justify-end">
+                        <div className="max-w-[85%] bg-blue-50 text-gray-800 border border-blue-100 px-4 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed">{msg.content}</div>
+                      </div>
+                    ) : (
+                      <div key={msg.id} className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600"><Bot size={14} /></div>
+                        <div className="flex-1">
+                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-line">{msg.content || msg.text || ''}</div>
+                        </div>
+                      </div>
+                    ))}
+                    {boardStreamingMsgId && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600"><Bot size={14} /></div>
+                        <div className="flex-1">
+                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
+                            {boardStreamingText}<span className="inline-block w-0.5 h-4 bg-blue-500 animate-pulse ml-0.5 align-text-bottom"></span>
+                          </div>
+                          {boardSteps.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {boardSteps.map((step, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs animate-in fade-in slide-in-from-bottom-1">
+                                  {i < boardSteps.length - 1 || boardSteps.length === 3 ? (
+                                    <Check size={14} className="text-green-500" />
+                                  ) : (
+                                    <Loader2 size={14} className="text-blue-500 animate-spin" />
+                                  )}
+                                  <span className={i < boardSteps.length - 1 || boardSteps.length === 3 ? 'text-green-700' : 'text-blue-600'}>{step}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-6 pb-6 mt-auto flex-shrink-0">
+                    {renderInputBox()}
+                  </div>
+                </div>
+
+                {/* Right: Dashboard Preview */}
+                {boardDashboardVisible && (
+                  <div className="bg-gray-50 flex flex-col h-full overflow-hidden animate-in fade-in slide-in-from-right-2">
+                    <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600"><BarChart2 size={16} /></div>
+                        <h3 className="text-sm font-bold text-gray-800">{boardTitle}</h3>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                      {/* Dynamic Filters */}
+                      {boardFilters.length > 0 && (
+                        <div className="space-y-3 mb-4">
+                          {boardFilters.map(filter => (
+                            <div key={filter.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 flex-wrap animate-in fade-in slide-in-from-top-1">
+                              <div className="flex items-center gap-2 text-sm text-gray-600">
+                                <Filter size={14} className="text-gray-400" />
+                                <span className="font-medium">{filter.label}</span>
+                              </div>
+                              {filter.type === 'date' && (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-500">开始日期</label>
+                                    <input type="date" value={filter.value?.start || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, start: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-500">结束日期</label>
+                                    <input type="date" value={filter.value?.end || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, end: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                                  </div>
+                                </>
+                              )}
+                              {filter.type === 'area' && (
+                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
+                                  <option value="">全部属地</option>
+                                  {boardUniqueAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                                </select>
+                              )}
+                              {filter.type === 'district' && (
+                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
+                                  <option value="">全部区县</option>
+                                  {boardUniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                              )}
+                              {filter.type === 'grid' && (
+                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
+                                  <option value="">全部网格</option>
+                                  {boardUniqueGrids.map(g => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                              )}
+                              {filter.type === 'hall' && (
+                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
+                                  <option value="">全部营业厅</option>
+                                  {boardUniqueHalls.map(h => <option key={h} value={h}>{h}</option>)}
+                                </select>
+                              )}
+                              <button onClick={() => removeBoardFilter(filter.id)} className="ml-auto text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="移除此筛选">
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                          <div className="flex items-center justify-end text-xs text-gray-400">共 {boardFilteredData.length} 条记录</div>
+                        </div>
+                      )}
+                      {boardFilters.length === 0 && (
+                        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-4 mb-4 flex items-center justify-center gap-2 text-sm text-gray-400">
+                          <Filter size={14} /> 暂无筛选条件，可通过左侧对话添加
+                        </div>
+                      )}
+
+                      {/* Data Table — dynamic columns */}
+                      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden relative" onClick={() => setBoardContextMenu(null)}>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              {/* Row 1: dimension headers (rowSpan 2) + metric group headers */}
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                {boardDimCols.map(k => {
+                                  const def = BOARD_ALL_COLUMNS[k];
+                                  return <th key={k} rowSpan={boardMetricGroups.length > 0 ? 2 : 1} className="px-3 py-2 text-left text-xs font-bold text-gray-600 border-r border-gray-100 whitespace-nowrap">{def.label}</th>;
+                                })}
+                                {boardMetricGroups.map((mg) => {
+                                  const colorMap = { blue: 'text-blue-600 bg-blue-50/50', emerald: 'text-emerald-600 bg-emerald-50/50', orange: 'text-orange-600 bg-orange-50/50', purple: 'text-purple-600 bg-purple-50/50', gray: 'text-gray-600 bg-gray-50/50' };
+                                  return <th key={mg.group} colSpan={mg.cols.length} className={`px-3 py-2 text-center text-xs font-bold border-r border-gray-100 ${colorMap[mg.color] || colorMap.gray}`}>{mg.group}</th>;
+                                })}
+                              </tr>
+                              {/* Row 2: individual metric sub-headers */}
+                              {boardMetricGroups.length > 0 && (
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                  {boardMetricCols.map((mk, mi) => (
+                                    <th key={mk} className={`px-3 py-1.5 text-center text-xs font-medium text-gray-500 border-r border-gray-100 whitespace-nowrap`}>{BOARD_ALL_COLUMNS[mk].label}</th>
+                                  ))}
+                                </tr>
+                              )}
+                            </thead>
+                            <tbody>
+                              {boardFilteredData.map((row, i) => (
+                                <tr key={i} className={`border-b border-gray-50 hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                  {boardDimCols.map(k => {
+                                    const def = BOARD_ALL_COLUMNS[k];
+                                    const hasDrill = def.drillChildren && def.drillChildren.length > 0;
+                                    return (
+                                      <td
+                                        key={k}
+                                        className={`px-3 py-2 text-xs border-r border-gray-50 whitespace-nowrap ${k === 'area' || k === 'district' ? 'text-gray-700 font-medium' : 'text-gray-600'} ${hasDrill ? 'cursor-context-menu' : ''}`}
+                                        onContextMenu={hasDrill ? (e) => { e.preventDefault(); setBoardContextMenu({ x: e.clientX, y: e.clientY, colKey: k, cellValue: row[k] }); } : undefined}
+                                      >
+                                        {row[k]}
+                                        {hasDrill && <ChevronDown size={10} className="inline ml-1 text-gray-300" />}
+                                      </td>
+                                    );
+                                  })}
+                                  {boardMetricCols.map((mk, mi) => {
+                                    const def = BOARD_ALL_COLUMNS[mk];
+                                    const val = row[mk];
+                                    const display = def.format === 'money' ? val.toLocaleString() : def.format === 'percent' ? val + '%' : val;
+                                    return <td key={mk} className="px-3 py-2 text-xs text-gray-700 text-center border-r border-gray-50">{display}</td>;
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Right-click context menu for drill-down */}
+                        {boardContextMenu && (() => {
+                          const def = BOARD_ALL_COLUMNS[boardContextMenu.colKey];
+                          const children = (def.drillChildren || []).filter(ck => !boardColumns.includes(ck));
+                          if (children.length === 0) return null;
+                          return (
+                            <div
+                              className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95"
+                              style={{ left: boardContextMenu.x, top: boardContextMenu.y }}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <div className="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wider">下钻维度</div>
+                              {children.map(ck => (
+                                <button
+                                  key={ck}
+                                  onClick={() => handleBoardDrill(boardContextMenu.colKey, ck)}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
+                                >
+                                  <ChevronRight size={12} className="text-gray-400" />
+                                  下钻到「{BOARD_ALL_COLUMNS[ck].label}」
+                                </button>
+                              ))}
+                              <div className="border-t border-gray-100 mt-1 pt-1">
+                                <button
+                                  onClick={() => setBoardContextMenu(null)}
+                                  className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 transition-colors"
+                                >
+                                  取消
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             // --- 对话流区域 ---
             <div className="w-full max-w-5xl mx-auto pb-32">
@@ -3031,7 +3503,7 @@ ${messages.map(msg => {
         </div>
       </div>
 
-      {isChatting && !isHtmlWorkspace && (
+      {isChatting && !isHtmlWorkspace && !isBoardWorkspace && (
         <div className="absolute bottom-0 w-full flex justify-center p-6 bg-gradient-to-t from-[#f4f6f8] via-[#f4f6f8]/95 to-transparent transition-all duration-500 z-20 pointer-events-none">
           <div className="w-full max-w-4xl relative pointer-events-auto">
             {renderInputBox()}
@@ -3169,9 +3641,7 @@ export default function App() {
 
   const breadcrumbs = buildBreadcrumbs();
 
-  if (currentView === 'smart-builder') {
-    return <SmartBuilderView onBack={goHome} />;
-  }
+  // smart-builder view is now handled inline as board mode in HomeView
 
   return (
     <div className="flex h-screen w-full bg-gray-50 font-sans text-gray-800 overflow-hidden relative">
