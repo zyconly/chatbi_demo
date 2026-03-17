@@ -84,7 +84,9 @@ import {
   Check,
   StarOff,
   Pencil,
-  Eye
+  Eye,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -840,7 +842,7 @@ const RecursiveMenuItem = ({ item, depth = 0, isCollapsed, activeId, expandedIds
         style={{ paddingLeft: isCollapsed ? undefined : paddingLeft, paddingRight: isCollapsed ? undefined : '16px' }}
         title={isCollapsed ? item.label : ''}
       >
-        <div className={`flex items-center ${isCollapsed ? '' : 'gap-3'} w-full`}>
+        <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full`}>
           {Icon && <Icon size={20} className={`flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-500'}`} />}
           {!isCollapsed && <span className={`text-sm font-medium whitespace-nowrap flex-1 ${!Icon && depth > 0 ? 'ml-1' : ''}`}>{item.label}</span>}
           {!isCollapsed && hasChildren && <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />}
@@ -1215,7 +1217,7 @@ const AgentsView = ({ onNavigate }) => {
   );
 };
 
-const AgentManageView = () => {
+const AgentManageView = ({ onNavigate }) => {
   const [statusFilter, setStatusFilter] = useState('全部');
   const [searchText, setSearchText] = useState('');
   const [menuOpenId, setMenuOpenId] = useState(null);
@@ -1267,7 +1269,7 @@ const AgentManageView = () => {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 md:grid-cols-2 gap-4">
           {filtered.map((item) => (
-            <div key={item.id} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 relative hover:shadow-md transition-shadow">
+            <div key={item.id} onClick={() => { if (item.status === '已发布' && onNavigate) onNavigate(`chat-agent-${item.id}`); }} className={`bg-white rounded-2xl border border-gray-200 shadow-sm p-4 relative hover:shadow-md transition-shadow ${item.status === '已发布' ? 'cursor-pointer' : ''}`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3">
                   <img src={`https://api.dicebear.com/9.x/adventurer/svg?seed=${item.id}`} alt="avatar" className="w-10 h-10 rounded-xl bg-blue-50" />
@@ -1279,7 +1281,7 @@ const AgentManageView = () => {
                     </div>
                   </div>
                 </div>
-                <button onClick={() => setMenuOpenId(menuOpenId === item.id ? null : item.id)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === item.id ? null : item.id); }} className="text-gray-400 hover:text-gray-600">
                   <MoreHorizontal size={16} />
                 </button>
               </div>
@@ -1291,7 +1293,7 @@ const AgentManageView = () => {
               </div>
 
               {menuOpenId === item.id && (
-                <div className="absolute right-4 top-12 bg-white rounded-xl border border-gray-200 shadow-xl w-28 py-1.5 z-20">
+                <div onClick={(e) => e.stopPropagation()} className="absolute right-4 top-12 bg-white rounded-xl border border-gray-200 shadow-xl w-28 py-1.5 z-20">
                   {['发布', '赋权', '修改', '复制'].map((action) => (
                     <button key={action} className="w-full text-left px-4 py-1.5 text-xs text-gray-700 hover:bg-gray-50">{action}</button>
                   ))}
@@ -1375,6 +1377,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [undoStack, setUndoStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
   const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
+  const [htmlFullscreen, setHtmlFullscreen] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -2031,7 +2034,7 @@ ${messages.map(msg => {
         value={inputText}
         onChange={(e) => setInputText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
-        className="w-full h-6 resize-none border-none focus:ring-0 text-gray-800 placeholder-gray-400 text-sm bg-transparent p-0 mb-1 leading-relaxed"
+        className="w-full h-6 resize-none border-none focus:ring-0 focus:outline-none outline-none text-gray-800 placeholder-gray-400 text-sm bg-transparent p-0 mb-1 leading-relaxed"
         placeholder=""
       ></textarea>
 
@@ -2346,7 +2349,12 @@ ${messages.map(msg => {
                 </div>
               ) : (
                 <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden bg-white">
-                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500">HTML 页面预览</div>
+                  <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex items-center justify-between">
+                    <span>HTML 页面预览</span>
+                    <button onClick={() => setHtmlFullscreen(true)} className="text-gray-400 hover:text-blue-500 transition-colors" title="最大化预览">
+                      <Maximize2 size={14} />
+                    </button>
+                  </div>
                     <iframe
                       title="html-preview-inline"
                       className="w-full border-0"
@@ -2624,6 +2632,29 @@ ${messages.map(msg => {
                 <Globe size={14} /> 预览分享页面
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* HTML 全屏预览弹窗 */}
+      {htmlFullscreen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 flex flex-col" onClick={() => setHtmlFullscreen(false)}>
+          <div className="flex items-center justify-between bg-white border-b border-gray-200 px-5 py-3 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Code size={16} className="text-indigo-500" />
+              HTML 页面预览
+            </div>
+            <button onClick={() => setHtmlFullscreen(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors">
+              <Minimize2 size={14} /> 退出全屏
+            </button>
+          </div>
+          <div className="flex-1 bg-white" onClick={(e) => e.stopPropagation()}>
+            <iframe
+              title="html-preview-fullscreen"
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+              src={`${publicBase}yuanqu/index.html`}
+            />
           </div>
         </div>
       )}
@@ -2969,7 +3000,12 @@ ${messages.map(msg => {
                       <div className="flex-1 overflow-hidden min-h-0">
                         {activeArtifact === 'preview' ? (
                           <div className="h-full flex flex-col overflow-hidden relative">
-                            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex-shrink-0">HTML 页面预览</div>
+                            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-between">
+                              <span>HTML 页面预览</span>
+                              <button onClick={() => setHtmlFullscreen(true)} className="text-gray-400 hover:text-blue-500 transition-colors" title="最大化预览">
+                                <Maximize2 size={14} />
+                              </button>
+                            </div>
                             <div className="flex-1 relative overflow-hidden">
                               <iframe
                                 ref={previewIframeRef}
@@ -3103,6 +3139,9 @@ ${messages.map(msg => {
                               </div>
                             ) : openedFile === 'html_preview' ? (
                               <div className="relative w-full h-full">
+                                <button onClick={() => setHtmlFullscreen(true)} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-blue-500 transition-colors" title="最大化预览">
+                                  <Maximize2 size={14} />
+                                </button>
                                 <iframe
                                   ref={previewIframeRef}
                                   title="html-preview-file"
@@ -3519,6 +3558,7 @@ export default function App() {
   const [isChatCollapsed, setIsChatCollapsed] = useState(false);
   const [currentView, setCurrentView] = useState('home');
   const [homeViewKey, setHomeViewKey] = useState(0);
+  const [agentViewKey, setAgentViewKey] = useState(0);
   const [activeGenType, setActiveGenType] = useState('qa');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -3608,6 +3648,14 @@ export default function App() {
     setHomeViewKey(prev => prev + 1);
   };
 
+  const newChat = () => {
+    if (currentView === 'chat-agent-1') {
+      setAgentViewKey(prev => prev + 1);
+    } else {
+      goHome();
+    }
+  };
+
   const isAgentView = currentView === 'chat-agent-1';
   const historyData = isAgentView ? agentHistoryData : globalHistoryData;
   const historyTitle = isAgentView ? '舆情助手历史' : '历史对话';
@@ -3665,7 +3713,7 @@ export default function App() {
 
       <div className={`bg-white border-r border-gray-200 flex flex-col flex-shrink-0 z-10 hidden md:flex transition-all duration-300 ${isChatCollapsed ? 'w-0 opacity-0 overflow-hidden' : 'w-72 opacity-100'}`}>
         <div className="p-4 min-w-[18rem]">
-          <button onClick={goHome} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium mb-6 group"><Plus size={18} /> 新建对话</button>
+          <button onClick={newChat} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium mb-6 group"><Plus size={18} /> 新建对话</button>
           <div className="space-y-2 mb-6">
              <div onClick={() => setCurrentView('chat-agent-1')} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${currentView === 'chat-agent-1' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-transparent'}`}>
                <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center text-blue-500"><User size={14} /></div><span className="text-sm text-gray-700">舆情分析助手</span></div>
@@ -3747,9 +3795,9 @@ export default function App() {
           </div>
         </div>
         {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} />}
-        {currentView === 'agent-manage' && <AgentManageView />}
+        {currentView === 'agent-manage' && <AgentManageView onNavigate={setCurrentView} />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
-        {currentView === 'chat-agent-1' && <ChatAgentView onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} />}
+        {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} />}
         {currentView === 'report-favorite' && (
           <div className="flex-1 overflow-y-auto p-8">
             <div className="max-w-4xl mx-auto">

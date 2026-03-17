@@ -1,16 +1,84 @@
-# React + Vite
+# ChatBI Demo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+对话式商业智能平台演示项目 — 通过自然语言交互完成数据查询、报告生成、看板搭建等分析任务。
 
-Currently, two official plugins are available:
+**在线演示**：[https://zyconly.github.io/chatbi_demo/](https://zyconly.github.io/chatbi_demo/)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 功能模块
 
-## React Compiler
+### 智能问数
+通过自然语言提问，即时获取数据查询结果，支持多轮对话持续追问。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 报告生成
+输入分析需求，自动生成结构化的数据分析报告。
 
-## Expanding the ESLint configuration
+### 通报仿写
+基于已有通报模版，AI 辅助生成符合格式规范的通报文档。
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 探索分析
+开放式数据探索，支持多维度自由分析。
+
+### HTML 页面生成
+输入需求描述，自动生成包含 SQL 查询、Python 数据处理和 HTML 可视化页面的完整报告。支持：
+- 实时代码追踪（流式生成 SQL → Python → HTML）
+- 在线预览与元素级编辑（点选元素 + 自然语言修改）
+- 报告模版管理（选择/上传/编辑模版）
+- 文件浏览、单独下载与一键打包（ZIP）
+
+### 智能看板
+通过对话生成交互式数据看板，支持：
+- 动态筛选条件（日期、属地、区县、网格、营业厅）
+- 对话式增删表格列与筛选条件
+- 维度下钻（属地 → 区县 → 街道，右键触发）
+- 指标分组表头（新增业务、宽带业务、利润指标、用户指标）
+
+## 智能体
+
+支持创建和管理 BI 智能体（如舆情分析助手），每个智能体拥有独立的对话上下文，并复用全部分析能力（问数、报告、HTML 生成、看板等）。
+
+## 技术栈
+
+- **框架**：React 19 + Vite 8
+- **样式**：Tailwind CSS 4
+- **图标**：Lucide React
+- **文件处理**：JSZip + FileSaver
+- **部署**：GitHub Pages（gh-pages）
+
+## 快速开始
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+
+# 构建生产版本
+npm run build
+
+# 部署到 GitHub Pages
+npm run deploy
+```
+
+## 项目结构
+
+```
+chatbi-app/
+├── src/
+│   └── App.jsx          # 主应用（包含全部组件和页面逻辑）
+├── public/              # 静态资源
+├── index.html           # 入口 HTML
+├── vite.config.js       # Vite 配置（base: /chatbi_demo/）
+├── tailwind.config.js   # Tailwind 配置
+└── package.json
+```
+
+## 界面概览
+
+| 页面 | 说明 |
+|------|------|
+| 首页 | 应用模式切换、提问示例、输入框 |
+| 对话视图 | 左侧对话流 + 右侧代码/预览/看板面板（44:56 分屏） |
+| 智能体管理 | 智能体列表、创建/编辑/发布 |
+| 报告模版管理 | 模版列表、上传/编辑/删除模版文件 |
+| 报告管理 | 收藏的报告列表 |
