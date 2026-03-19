@@ -91,6 +91,7 @@ import {
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ipMascot from './assets/img.png';
+import { searchWeb } from './searchService';
 
 // --- 样式注入 ---
 const styles = `
@@ -537,7 +538,8 @@ const menuStructure = [
       { id: 'qa-feedback', label: '问答反馈', type: 'item' },
       { id: 'notice-manage', label: '公告管理', type: 'item' },
       { id: 'batch-verify', label: '批量验证', type: 'item' },
-      { id: 'op-stat', label: '运营统计', type: 'item' }
+      { id: 'op-stat', label: '运营统计', type: 'item' },
+      { id: 'suggestion-manage', label: '提问示例管理', type: 'item', view: 'suggestion-manage' }
     ]
   },
   {
@@ -555,7 +557,7 @@ const menuStructure = [
   }
 ];
 
-const suggestionsMap = {
+const initialSuggestionsMap = {
   qa: [
     { title: '指标查询', query: '收入情况如何？', files: [{ name: '各省份营收表.xlsx', size: '24.1MB' }] },
     { title: '精准查询', query: '2024年12月湖北省通话收入是多少？', files: [{ name: '用户通信费用日表.csv', size: '13.39k' }] },
@@ -732,50 +734,48 @@ const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
         return;
       }
       if (mode === 'html') {
-        const safeTitle = templateTitle || query.trim() || '页面原型';
-        const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
-        const fileName = `${fileBase}.html`;
-        const previewHtml = `
-          <div style="font-family: 'Segoe UI', Arial, sans-serif; background:#f6f8fb; padding:24px;">
-            <div style="max-width:860px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,0.08);">
-              <div style="padding:28px 32px;border-bottom:1px solid #f1f5f9;background:linear-gradient(90deg,#eef2ff,#f8fafc);">
-                <div style="font-size:14px;color:#64748b;letter-spacing:0.6px;">HTML 页面原型预览</div>
-                <div style="font-size:26px;font-weight:700;color:#0f172a;margin-top:6px;">${safeTitle}</div>
-                <div style="font-size:14px;color:#64748b;margin-top:10px;max-width:520px;">这是一份可直接落地的页面原型，可按你的需求继续细化模块与视觉风格。</div>
-              </div>
-              <div style="padding:24px 32px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
-                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
-                  <div style="font-size:12px;color:#94a3b8;">模块</div>
-                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">核心指标</div>
-                  <div style="font-size:12px;color:#64748b;margin-top:10px;">展示关键KPI卡片与趋势。</div>
-                </div>
-                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
-                  <div style="font-size:12px;color:#94a3b8;">模块</div>
-                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">用户分群</div>
-                  <div style="font-size:12px;color:#64748b;margin-top:10px;">呈现人群画像与洞察。</div>
-                </div>
-                <div style="border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
-                  <div style="font-size:12px;color:#94a3b8;">模块</div>
-                  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-top:6px;">行动建议</div>
-                  <div style="font-size:12px;color:#64748b;margin-top:10px;">输出可执行的策略建议。</div>
-                </div>
-              </div>
-              <div style="padding:0 32px 28px;">
-                <button style="background:#4f46e5;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-weight:600;cursor:pointer;">开始使用</button>
-                <button style="background:#ffffff;color:#4f46e5;border:1px solid #c7d2fe;border-radius:10px;padding:10px 18px;font-weight:600;margin-left:10px;cursor:pointer;">查看详情</button>
-              </div>
-            </div>
-          </div>
-        `;
-        const code = TEMPLATE_HTML_WITH_CSS.replace('上海产业园区春节前后人流数据分析报告', safeTitle);
+        // 第一步：根据语义召回相关数据集，让用户确认
+        const allDatasets = [
+          { id: 'ds-1', name: '用户通信费用日表', size: '13.39k', desc: '包含用户每日通话、流量、短信等通信费用明细' },
+          { id: 'ds-2', name: '经营分析数据集', size: '45.2MB', desc: '月度经营指标汇总，涵盖收入、成本、利润等' },
+          { id: 'ds-3', name: '流失用户分析数据集', size: '23.4MB', desc: '用户流失特征、流失原因和挽留行为数据' },
+          { id: 'ds-4', name: '各省份营收表', size: '24.1MB', desc: '各省份月度营收数据，含主营收入与增值收入' },
+          { id: 'ds-5', name: '园区人流统计', size: '15.6MB', desc: '产业园区人流量统计，含出入时段与人群画像' },
+          { id: 'ds-6', name: '用户画像数据', size: '28.9MB', desc: '用户基础属性与消费行为画像标签库' },
+          { id: 'ds-7', name: '套餐明细数据', size: '19.5MB', desc: '各类套餐内容、订购量及使用情况明细' },
+          { id: 'ds-8', name: '投诉记录_2025', size: '102k', desc: '客户投诉工单记录，含分类、处理时长和满意度' },
+          { id: 'ds-9', name: '宽带业务数据', size: '12.3MB', desc: '宽带业务办理量、续约率与收入统计' },
+          { id: 'ds-10', name: '月度收入趋势表', size: '5.2MB', desc: '按月汇总的各业务线收入趋势数据' },
+        ];
+        // 根据关键词匹配召回数据集
+        const q = query.toLowerCase();
+        const keywordMap = [
+          { keywords: ['经营', '收入', '利润', '成本', '营收'], ids: ['ds-2', 'ds-1', 'ds-4', 'ds-10'] },
+          { keywords: ['流失', '挽留', '留存'], ids: ['ds-3', 'ds-1', 'ds-6'] },
+          { keywords: ['用户', '画像', '人群', '分群'], ids: ['ds-6', 'ds-1', 'ds-3'] },
+          { keywords: ['园区', '人流', '出入'], ids: ['ds-5', 'ds-6'] },
+          { keywords: ['套餐', '订购', '包'], ids: ['ds-7', 'ds-1', 'ds-9'] },
+          { keywords: ['投诉', '满意度', '反馈'], ids: ['ds-8', 'ds-1'] },
+          { keywords: ['宽带', '光纤'], ids: ['ds-9', 'ds-1', 'ds-2'] },
+          { keywords: ['趋势', '月度'], ids: ['ds-10', 'ds-2', 'ds-4'] },
+          { keywords: ['省份', '地区', '区域'], ids: ['ds-4', 'ds-2', 'ds-1'] },
+        ];
+        const matchedIds = new Set();
+        for (const rule of keywordMap) {
+          if (rule.keywords.some(kw => q.includes(kw))) {
+            rule.ids.forEach(id => matchedIds.add(id));
+          }
+        }
+        // 如果没有匹配到任何关键词，默认召回前 3 个通用数据集
+        if (matchedIds.size === 0) {
+          ['ds-1', 'ds-2', 'ds-4'].forEach(id => matchedIds.add(id));
+        }
+        const recalledDatasets = allDatasets.filter(ds => matchedIds.has(ds.id));
         resolve({
-          type: 'html_prototype',
-          title: safeTitle,
-          fileName,
-          code,
-          sql: `-- SQL 示例\nSELECT province_id, SUM(call_fee) AS call_revenue\nFROM user_comm_fee_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY province_id\nORDER BY call_revenue DESC;`,
-          python: `# Python 示例\nimport pandas as pd\n\ndf = pd.read_csv("user_comm_fee_daily.csv")\nresult = (\n    df.query("stat_date >= '2025-01-01' and stat_date <= '2025-12-31'")\n      .groupby("province_id", as_index=False)["call_fee"].sum()\n      .sort_values("call_fee", ascending=False)\n)\nprint(result.head())`,
-          previewHtml: code
+          type: 'dataset_recall',
+          text: `已根据您的需求「${query}」语义分析，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`,
+          datasets: recalledDatasets,
+          originalQuery: query,
         });
         return;
       }
@@ -852,13 +852,13 @@ const RecursiveMenuItem = ({ item, depth = 0, isCollapsed, activeId, expandedIds
 
       {isCollapsed && hasChildren && (
         <div className="hidden group-hover:block absolute left-full top-0 ml-1 bg-white shadow-xl rounded-lg border border-gray-100 z-50 w-48 py-2 animate-in fade-in zoom-in-95 duration-150">
-           <div className="px-3 py-1.5 text-xs font-bold text-gray-400 border-b border-gray-50 mb-1">{item.label}</div>
-           {item.children.map(child => (
-             <div key={child.id} onClick={(e) => { e.stopPropagation(); onSelect(child.id, child.view); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 cursor-pointer flex items-center justify-between">
-               {child.label}
-               {child.children && <ChevronRight size={12} className="text-gray-300" />}
-             </div>
-           ))}
+          <div className="px-3 py-1.5 text-xs font-bold text-gray-400 border-b border-gray-50 mb-1">{item.label}</div>
+          {item.children.map(child => (
+            <div key={child.id} onClick={(e) => { e.stopPropagation(); onSelect(child.id, child.view); }} className="px-4 py-2 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 cursor-pointer flex items-center justify-between">
+              {child.label}
+              {child.children && <ChevronRight size={12} className="text-gray-300" />}
+            </div>
+          ))}
         </div>
       )}
 
@@ -939,7 +939,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, currentView, setCurrentView, onG
           onClick={() => setShowUserMenu(!showUserMenu)}
         >
           <div className="w-8 h-8 bg-gray-200 rounded-full overflow-hidden flex-shrink-0 border border-gray-300">
-             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
           </div>
           {!isCollapsed && <div className="flex-1 overflow-hidden"><div className="text-sm font-medium truncate">132365***30</div><div className="text-xs text-gray-400 truncate">默认空间</div></div>}
           {!isCollapsed && <MoreHorizontal size={16} className="text-gray-400 flex-shrink-0" />}
@@ -1107,23 +1107,23 @@ const DISTRICT_STREETS = {
 // All possible columns definition
 const BOARD_ALL_COLUMNS = {
   // Dimensions
-  date:     { key: 'date', label: '日期', group: 'dim', isDim: true },
-  area:     { key: 'area', label: '属地', group: 'dim', isDim: true, drillChildren: ['district'] },
+  date: { key: 'date', label: '日期', group: 'dim', isDim: true },
+  area: { key: 'area', label: '属地', group: 'dim', isDim: true, drillChildren: ['district'] },
   district: { key: 'district', label: '区县', group: 'dim', isDim: true, drillChildren: ['street'], drillParent: 'area' },
-  street:   { key: 'street', label: '街道', group: 'dim', isDim: true, drillParent: 'district' },
-  grid:     { key: 'grid', label: '网格', group: 'dim', isDim: true },
-  hall:     { key: 'hall', label: '营业厅', group: 'dim', isDim: true },
+  street: { key: 'street', label: '街道', group: 'dim', isDim: true, drillParent: 'district' },
+  grid: { key: 'grid', label: '网格', group: 'dim', isDim: true },
+  hall: { key: 'hall', label: '营业厅', group: 'dim', isDim: true },
   // Metrics — grouped
-  newCount:          { key: 'newCount', label: '新增办理量', group: '新增业务', groupColor: 'blue' },
-  newRevenue:        { key: 'newRevenue', label: '新增收入', group: '新增业务', groupColor: 'blue', format: 'money' },
-  broadbandCount:    { key: 'broadbandCount', label: '宽带办理量', group: '宽带业务', groupColor: 'emerald' },
-  broadbandRevenue:  { key: 'broadbandRevenue', label: '宽带收入', group: '宽带业务', groupColor: 'emerald', format: 'money' },
+  newCount: { key: 'newCount', label: '新增办理量', group: '新增业务', groupColor: 'blue' },
+  newRevenue: { key: 'newRevenue', label: '新增收入', group: '新增业务', groupColor: 'blue', format: 'money' },
+  broadbandCount: { key: 'broadbandCount', label: '宽带办理量', group: '宽带业务', groupColor: 'emerald' },
+  broadbandRevenue: { key: 'broadbandRevenue', label: '宽带收入', group: '宽带业务', groupColor: 'emerald', format: 'money' },
   // Extra metrics available for adding
-  profit:            { key: 'profit', label: '利润', group: '利润指标', groupColor: 'orange', format: 'money' },
-  profitRate:        { key: 'profitRate', label: '利润率', group: '利润指标', groupColor: 'orange', format: 'percent' },
-  userCount:         { key: 'userCount', label: '用户数', group: '用户指标', groupColor: 'purple' },
-  churnRate:         { key: 'churnRate', label: '流失率', group: '用户指标', groupColor: 'purple', format: 'percent' },
-  satisfaction:      { key: 'satisfaction', label: '满意度', group: '用户指标', groupColor: 'purple', format: 'percent' },
+  profit: { key: 'profit', label: '利润', group: '利润指标', groupColor: 'orange', format: 'money' },
+  profitRate: { key: 'profitRate', label: '利润率', group: '利润指标', groupColor: 'orange', format: 'percent' },
+  userCount: { key: 'userCount', label: '用户数', group: '用户指标', groupColor: 'purple' },
+  churnRate: { key: 'churnRate', label: '流失率', group: '用户指标', groupColor: 'purple', format: 'percent' },
+  satisfaction: { key: 'satisfaction', label: '满意度', group: '用户指标', groupColor: 'purple', format: 'percent' },
 };
 
 const BOARD_DEFAULT_COLUMNS = ['date', 'area', 'grid', 'hall', 'newCount', 'newRevenue', 'broadbandCount', 'broadbandRevenue'];
@@ -1166,13 +1166,14 @@ const DASHBOARD_MOCK_DATA = (() => {
 
 // SmartBuilderView removed — board mode is now handled inline in HomeView
 
-const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, setFavoriteReports, agentInfo }) => (
+const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, setFavoriteReports, agentInfo, suggestionsMap }) => (
   <HomeView
-    onNavigate={onNavigate || (() => {})}
+    onNavigate={onNavigate || (() => { })}
     favoriteReports={favoriteReports}
     setFavoriteReports={setFavoriteReports}
     agentInfo={agentInfo || { name: '舆情分析助手', desc: '智能化舆情监测与分析，实时掌握网络动态，精准洞察公众情绪，为决策提供数据支持' }}
     onGenTypeChange={onGenTypeChange}
+    suggestionsMap={suggestionsMap}
   />
 );
 
@@ -1308,8 +1309,216 @@ const AgentManageView = ({ onNavigate }) => {
   );
 };
 
+// --- 数据集召回确认卡片（支持搜索添加） ---
+const ALL_SEARCHABLE_DATASETS = [
+  { id: 'ds-1', name: '用户通信费用日表', size: '13.39k', desc: '包含用户每日通话、流量、短信等通信费用明细' },
+  { id: 'ds-2', name: '经营分析数据集', size: '45.2MB', desc: '月度经营指标汇总，涵盖收入、成本、利润等' },
+  { id: 'ds-3', name: '流失用户分析数据集', size: '23.4MB', desc: '用户流失特征、流失原因和挽留行为数据' },
+  { id: 'ds-4', name: '各省份营收表', size: '24.1MB', desc: '各省份月度营收数据，含主营收入与增值收入' },
+  { id: 'ds-5', name: '园区人流统计', size: '15.6MB', desc: '产业园区人流量统计，含出入时段与人群画像' },
+  { id: 'ds-6', name: '用户画像数据', size: '28.9MB', desc: '用户基础属性与消费行为画像标签库' },
+  { id: 'ds-7', name: '套餐明细数据', size: '19.5MB', desc: '各类套餐内容、订购量及使用情况明细' },
+  { id: 'ds-8', name: '投诉记录_2025', size: '102k', desc: '客户投诉工单记录，含分类、处理时长和满意度' },
+  { id: 'ds-9', name: '宽带业务数据', size: '12.3MB', desc: '宽带业务办理量、续约率与收入统计' },
+  { id: 'ds-10', name: '月度收入趋势表', size: '5.2MB', desc: '按月汇总的各业务线收入趋势数据' },
+  { id: 'ds-11', name: '5G用户发展统计', size: '8.7MB', desc: '5G套餐开通、渗透率与用户增长数据' },
+  { id: 'ds-12', name: '营业厅业绩表', size: '15.6MB', desc: '各属地营业厅业务办理量与业绩考核数据' },
+  { id: 'ds-13', name: '网络质量指标', size: '12.3MB', desc: '网络覆盖、时延、掉线率等质量监控数据' },
+  { id: 'ds-14', name: '政企客户数据', size: '34.7MB', desc: '政企客户合同、收入及服务使用情况' },
+  { id: 'ds-15', name: '增值业务订购表', size: '6.1MB', desc: '各类增值业务的订购量与退订率统计' },
+];
+
+const DatasetRecallCard = ({ msg, onConfirm }) => {
+  // 合并召回的数据集和可能手动添加的数据集
+  const [displayDatasets, setDisplayDatasets] = useState(() => msg.datasets);
+  const [selected, setSelected] = useState(() => msg.datasets.map(d => d.id));
+  const [confirmed, setConfirmed] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
+  // 记录手动添加的 id
+  const [manuallyAdded, setManuallyAdded] = useState(new Set());
+
+  const toggle = (id) => {
+    if (confirmed) return;
+    setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const handleConfirm = () => {
+    if (selected.length === 0 || confirmed) return;
+    setConfirmed(true);
+    const selectedDatasets = displayDatasets.filter(d => selected.includes(d.id));
+    onConfirm(selectedDatasets, msg.originalQuery);
+  };
+
+  const handleAddFromSearch = (ds) => {
+    if (displayDatasets.some(d => d.id === ds.id)) return;
+    setDisplayDatasets(prev => [...prev, ds]);
+    setSelected(prev => [...prev, ds.id]);
+    setManuallyAdded(prev => new Set(prev).add(ds.id));
+    setSearchQuery('');
+  };
+
+  const handleOpenSearch = () => {
+    setShowSearch(true);
+    setTimeout(() => searchInputRef.current?.focus(), 100);
+  };
+
+  // 搜索过滤：排除已在 displayDatasets 中的，按名称和描述模糊匹配
+  const searchResults = searchQuery.trim()
+    ? ALL_SEARCHABLE_DATASETS
+      .filter(ds => !displayDatasets.some(d => d.id === ds.id))
+      .filter(ds => {
+        const q = searchQuery.toLowerCase();
+        return ds.name.toLowerCase().includes(q) || ds.desc.toLowerCase().includes(q);
+      })
+    : [];
+
+  const renderDatasetItem = (ds, isManual = false) => (
+    <div
+      key={ds.id}
+      onClick={() => toggle(ds.id)}
+      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${confirmed ? 'cursor-default' : ''
+        } ${selected.includes(ds.id)
+          ? 'bg-emerald-50 border-emerald-200 shadow-sm'
+          : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+        } ${confirmed && !selected.includes(ds.id) ? 'opacity-40' : ''}`}
+    >
+      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected.includes(ds.id)
+          ? 'bg-emerald-500 border-emerald-500'
+          : 'border-gray-300 bg-white'
+        }`}>
+        {selected.includes(ds.id) && <Check size={12} className="text-white" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium ${selected.includes(ds.id) ? 'text-emerald-700' : 'text-gray-700'}`}>{ds.name}</span>
+          <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{ds.size}</span>
+          {isManual && (
+            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 font-medium">手动添加</span>
+          )}
+        </div>
+        <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>
+      </div>
+      <FileSpreadsheet size={16} className={`flex-shrink-0 ${selected.includes(ds.id) ? 'text-emerald-400' : 'text-gray-300'}`} />
+    </div>
+  );
+
+  return (
+    <div className="flex items-start gap-4 mb-6 w-full max-w-3xl animate-in fade-in slide-in-from-bottom-2">
+      <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-gray-200 shadow-sm">
+        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-emerald-400 to-teal-500 flex items-center justify-center text-white"><Database size={14} /></div>
+      </div>
+      <div className="flex-1 bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Database size={16} className="text-emerald-600" />
+          <span className="text-sm font-bold text-gray-800">语义召回数据集</span>
+          <span className="text-xs text-gray-400 ml-auto">共召回 {msg.datasets.length} 个</span>
+        </div>
+        <p className="text-sm text-gray-600 mb-4 leading-relaxed">{msg.text}</p>
+
+        {/* 数据集列表 */}
+        <div className="space-y-2 mb-3">
+          {displayDatasets.map(ds => renderDatasetItem(ds, manuallyAdded.has(ds.id)))}
+        </div>
+
+        {/* 搜索添加区域 */}
+        {!confirmed && (
+          <div className="mb-4">
+            {!showSearch ? (
+              <button
+                onClick={handleOpenSearch}
+                className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors py-1"
+              >
+                <Search size={12} />
+                找不到需要的数据集？点击搜索添加
+              </button>
+            ) : (
+              <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/30 animate-in fade-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search size={14} className="text-blue-500 flex-shrink-0" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="输入数据集名称搜索..."
+                    className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
+                  />
+                  <button
+                    onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+                    className="text-gray-400 hover:text-gray-600 p-1"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+
+                {searchQuery.trim() && (
+                  <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                    {searchResults.length > 0 ? (
+                      searchResults.map(ds => (
+                        <div
+                          key={ds.id}
+                          onClick={() => handleAddFromSearch(ds)}
+                          className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 bg-white hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-all group"
+                        >
+                          <div className="w-5 h-5 rounded border-2 border-dashed border-blue-300 flex items-center justify-center flex-shrink-0 group-hover:border-blue-500 group-hover:bg-blue-500 transition-colors">
+                            <Plus size={10} className="text-blue-400 group-hover:text-white transition-colors" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700 transition-colors">{ds.name}</span>
+                              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{ds.size}</span>
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>
+                          </div>
+                          <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">点击添加</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-xs text-gray-400">
+                        未找到匹配「{searchQuery}」的数据集
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!searchQuery.trim() && (
+                  <div className="text-xs text-gray-400 text-center py-2">
+                    输入关键词搜索全部 {ALL_SEARCHABLE_DATASETS.length} 个数据集
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 底部操作区 */}
+        {!confirmed ? (
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs text-gray-400">
+              已选择 {selected.length} 个数据集{manuallyAdded.size > 0 ? `（含 ${manuallyAdded.size} 个手动添加）` : ''}
+            </span>
+            <button
+              onClick={handleConfirm}
+              disabled={selected.length === 0}
+              className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              <Sparkles size={14} /> 确认并生成
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+            <Check size={14} /> 已确认，正在基于 {selected.length} 个数据集生成 HTML 页面...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- HomeView：集成多轮对话流引擎 ---
-const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange }) => {
+const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, suggestionsMap }) => {
   const [inputText, setInputText] = useState('');
   const [activeFiles, setActiveFiles] = useState([{ name: '用户通信费用日表.csv', size: '13.39k' }]);
   const [messages, setMessages] = useState([]);
@@ -1378,6 +1587,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [redoStack, setRedoStack] = useState([]);
   const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
   const [htmlFullscreen, setHtmlFullscreen] = useState(false);
+  const [htmlQueryMode, setHtmlQueryMode] = useState(false); // 报表问数模式
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -1547,13 +1757,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Micr
 <div class="container">
 <div class="header"><h1>ChatBI 会话分享</h1><p>生成时间：${new Date().toLocaleString('zh-CN')}</p></div>
 ${messages.map(msg => {
-  if (msg.role === 'user') {
-    return `<div class="msg user"><div class="bubble">${msg.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>`;
-  }
-  const isEdit = msg.type === 'edit_reply';
-  const text = msg.text || msg.queryInfo || '已生成回复。';
-  return `<div class="msg ai"><div class="avatar">🤖</div><div class="bubble${isEdit ? ' edit' : ''}">${isEdit ? '<div class="edit-tag">✅ 修改已完成</div>' : ''}${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div></div>`;
-}).join('\\n')}
+      if (msg.role === 'user') {
+        return `<div class="msg user"><div class="bubble">${msg.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></div>`;
+      }
+      const isEdit = msg.type === 'edit_reply';
+      const text = msg.text || msg.queryInfo || '已生成回复。';
+      return `<div class="msg ai"><div class="avatar">🤖</div><div class="bubble${isEdit ? ' edit' : ''}">${isEdit ? '<div class="edit-tag">✅ 修改已完成</div>' : ''}${text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div></div>`;
+    }).join('\\n')}
 <div class="report-frame"><div class="frame-header">📊 生成的报告预览</div><iframe src="${reportUrl}"></iframe></div>
 <div class="footer">由 ChatBI 生成 · AI 决策助手</div>
 </div></body></html>`;
@@ -1848,21 +2058,121 @@ ${messages.map(msg => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // 用户在 dataset_recall 确认后触发 HTML 生成
+  const handleDatasetRecallConfirm = (selectedDatasets, originalQuery) => {
+    // 发一条用户确认消息
+    const confirmMsg = { id: Date.now(), role: 'user', content: `使用「${selectedDatasets.map(d => d.name).join('、')}」生成页面` };
+    setMessages(prev => [...prev, confirmMsg]);
+    setIsLoading(true);
+    // 更新 activeFiles 为用户选择的数据集
+    setActiveFiles(selectedDatasets.map(d => ({ name: d.name, size: d.size })));
+
+    setTimeout(() => {
+      const safeTitle = originalQuery.trim() || '页面原型';
+      const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
+      const fileName = `${fileBase}.html`;
+      const code = TEMPLATE_HTML_WITH_CSS.replace('上海产业园区春节前后人流数据分析报告', safeTitle);
+      const datasetNames = selectedDatasets.map(d => d.name).join('、');
+      const responseData = {
+        type: 'html_prototype',
+        title: safeTitle,
+        fileName,
+        code,
+        sql: `-- 基于数据集: ${datasetNames}\nSELECT province_id, SUM(call_fee) AS call_revenue\nFROM user_comm_fee_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY province_id\nORDER BY call_revenue DESC;`,
+        python: `# 基于数据集: ${datasetNames}\nimport pandas as pd\n\ndf = pd.read_csv("user_comm_fee_daily.csv")\nresult = (\n    df.query("stat_date >= '2025-01-01' and stat_date <= '2025-12-31'")\n      .groupby("province_id", as_index=False)["call_fee"].sum()\n      .sort_values("call_fee", ascending=False)\n)\nprint(result.head())`,
+        previewHtml: code
+      };
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', ...responseData }]);
+      setIsLoading(false);
+      setActiveArtifact('sql');
+    }, 1200);
+  };
+
   const handleSendMessage = async (textOverride) => {
     const text = textOverride || inputText;
     if (!text.trim()) return;
-
-    // HTML 模式下必须选择模版
-    if (generationType === 'html' && !selectedTemplateId) {
-      setShowTemplateWarning(true);
-      setTimeout(() => setShowTemplateWarning(false), 3000);
-      return;
-    }
 
     const newUserMsg = { id: Date.now(), role: 'user', content: text };
     setMessages(prev => [...prev, newUserMsg]);
     setInputText('');
     setIsLoading(true);
+
+    // 报表问数模式：走 Chat2SQL 路径
+    if (htmlQueryMode && generationType === 'html') {
+      const datasetNames = activeFiles.map(f => f.name).join('、');
+      const q = text.toLowerCase();
+      // 模拟 Chat2SQL 响应
+      let resultLabel = text.replace(/[是多少？?。]/g, '').trim();
+      let resultValue = '';
+      let sql = '';
+      let trend = 'up';
+      if (q.includes('环比')) {
+        resultValue = '+12.6%';
+        sql = `-- 基于数据集: ${datasetNames}\nSELECT\n  period,\n  daily_avg_flow,\n  ROUND((daily_avg_flow - LAG(daily_avg_flow) OVER(ORDER BY period)) / LAG(daily_avg_flow) OVER(ORDER BY period) * 100, 1) AS mom_rate\nFROM (\n  SELECT\n    DATE_FORMAT(stat_date, '%Y-%m') AS period,\n    AVG(flow_count) AS daily_avg_flow\n  FROM park_flow_daily\n  GROUP BY period\n) t\nORDER BY period DESC\nLIMIT 1;`;
+      } else if (q.includes('同比')) {
+        resultValue = '+8.3%';
+        trend = 'up';
+        sql = `-- 基于数据集: ${datasetNames}\nSELECT\n  this_year.period,\n  ROUND((this_year.val - last_year.val) / last_year.val * 100, 1) AS yoy_rate\nFROM (\n  SELECT DATE_FORMAT(stat_date, '%m') AS period, SUM(flow_count) AS val\n  FROM park_flow_daily WHERE YEAR(stat_date) = 2025 GROUP BY period\n) this_year\nJOIN (\n  SELECT DATE_FORMAT(stat_date, '%m') AS period, SUM(flow_count) AS val\n  FROM park_flow_daily WHERE YEAR(stat_date) = 2024 GROUP BY period\n) last_year ON this_year.period = last_year.period\nORDER BY this_year.period DESC LIMIT 1;`;
+      } else if (q.includes('最高') || q.includes('最大') || q.includes('排名')) {
+        resultLabel = '人流量最高园区';
+        resultValue = '张江科技园 · 12,856人/日';
+        trend = 'neutral';
+        sql = `-- 基于数据集: ${datasetNames}\nSELECT park_name, AVG(flow_count) AS avg_daily_flow\nFROM park_flow_daily\nWHERE stat_date >= '2025-01-01'\nGROUP BY park_name\nORDER BY avg_daily_flow DESC\nLIMIT 1;`;
+      } else if (q.includes('总') || q.includes('总量')) {
+        resultLabel = '总人流量';
+        resultValue = '1,284,562';
+        trend = 'neutral';
+        sql = `-- 基于数据集: ${datasetNames}\nSELECT SUM(flow_count) AS total_flow\nFROM park_flow_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-03-31';`;
+      } else {
+        resultValue = '9,832';
+        sql = `-- 基于数据集: ${datasetNames}\nSELECT AVG(flow_count) AS avg_daily_flow\nFROM park_flow_daily\nWHERE stat_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY);`;
+      }
+
+      // 模拟思考过程 + 流式返回
+      const aiMsgId = Date.now() + 1;
+      const thinkingSteps = [
+        { label: '意图分析', detail: '用户意图：基于报表数据查询指标', time: '0.3s' },
+        { label: '数据集匹配', detail: `关联数据集：${datasetNames}`, time: '0.5s' },
+        { label: 'SQL 生成', detail: '已根据问题生成查询语句', time: '1.2s' },
+        { label: '执行查询', detail: '查询完成，返回结果', time: '0.8s' },
+      ];
+      const followUpQuestions = [
+        '各园区日均人流量对比如何？',
+        '工作日与周末人流差异多大？',
+        '近三个月的趋势变化？',
+      ];
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: aiMsgId,
+          role: 'ai',
+          type: 'chat2sql_result',
+          text: `【Chat2SQL数据查询】${resultLabel}：${resultValue}`, // 解决“已生成回复”的问题，用于历史分享和预览
+          thinkingSteps,
+          sql,
+          result: { label: resultLabel, value: resultValue, trend },
+          followUpQuestions,
+          datasetNames,
+        }]);
+        setIsLoading(false);
+      }, 1800);
+      return;
+    }
+
+    // Web search when enabled in explore mode
+    if (webSearchEnabled && generationType === 'explore') {
+      setMessages(prev => [...prev, { id: Date.now() + 0.1, role: 'system', type: 'search_loading' }]);
+      try {
+        const searchResults = await searchWeb(text);
+        // Remove loading indicator
+        setMessages(prev => prev.filter(m => m.type !== 'search_loading'));
+        if (searchResults.length > 0) {
+          setMessages(prev => [...prev, { id: Date.now() + 0.2, role: 'ai', type: 'search_results', results: searchResults, query: text }]);
+        }
+      } catch {
+        setMessages(prev => prev.filter(m => m.type !== 'search_loading'));
+      }
+    }
 
     const templateTitle = htmlTemplates.find(t => t.id === selectedTemplateId)?.title || '';
     const responseData = await simulateAIResponse(text, generationType, templateTitle);
@@ -2073,9 +2383,8 @@ ${messages.map(msg => {
                         <button
                           key={tpl.id}
                           onClick={() => setTempSelectedTemplateId(tpl.id)}
-                          className={`text-left border-2 rounded-2xl p-4 transition-colors ${
-                            tempSelectedTemplateId === tpl.id ? 'border-blue-500 shadow-sm' : 'border-gray-300 hover:border-blue-300'
-                          }`}
+                          className={`text-left border-2 rounded-2xl p-4 transition-colors ${tempSelectedTemplateId === tpl.id ? 'border-blue-500 shadow-sm' : 'border-gray-300 hover:border-blue-300'
+                            }`}
                         >
                           <div className="h-28 rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-500 text-white flex items-center justify-center text-xs font-semibold">
                             2026年上/中/下旬问题多人群画像分析报告
@@ -2133,6 +2442,25 @@ ${messages.map(msg => {
               <Globe size={14} />
             </button>
           )}
+          {generationType === 'html' && latestHtmlMsg && (
+            <button
+              onClick={() => setHtmlQueryMode(!htmlQueryMode)}
+              className={`flex items-center gap-1.5 text-xs font-medium transition-all px-3 py-1.5 rounded-lg border shadow-sm ${
+                htmlQueryMode
+                  ? 'bg-amber-50 text-amber-700 border-amber-200 ring-2 ring-amber-100'
+                  : 'bg-gray-50 text-gray-600 border-transparent hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200'
+              }`}
+              title={htmlQueryMode ? '关闭报表问数模式' : '开启报表问数模式'}
+            >
+              <BarChart2 size={14} />
+              <span>报表问数</span>
+              <div className={`w-7 h-4 rounded-full flex items-center transition-all px-0.5 ${
+                htmlQueryMode ? 'bg-amber-500 justify-end' : 'bg-gray-300 justify-start'
+              }`}>
+                <div className="w-3 h-3 bg-white rounded-full shadow-sm" />
+              </div>
+            </button>
+          )}
         </div>
 
         <button
@@ -2157,7 +2485,153 @@ ${messages.map(msg => {
       );
     }
 
+    // Search loading indicator
+    if (msg.type === 'search_loading') {
+      return (
+        <div key={msg.id} className="flex items-center gap-3 mb-4 w-full animate-in fade-in slide-in-from-bottom-2">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-gray-200 shadow-sm">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-400 to-purple-500 flex items-center justify-center text-white"><Globe size={14} /></div>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-indigo-600 bg-indigo-50 border border-indigo-100 px-4 py-2.5 rounded-2xl rounded-tl-sm shadow-sm">
+            <Loader2 size={14} className="animate-spin" /> 正在搜索网络...
+          </div>
+        </div>
+      );
+    }
+
     if (msg.role === 'ai') {
+      // Search results card
+      if (msg.type === 'search_results') {
+        return (
+          <div key={msg.id} className="flex items-start gap-4 mb-6 w-full max-w-3xl animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-gray-200 shadow-sm">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-400 to-purple-500 flex items-center justify-center text-white"><Globe size={14} /></div>
+            </div>
+            <div className="flex-1 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 p-5 rounded-2xl rounded-tl-sm shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe size={16} className="text-indigo-600" />
+                <span className="text-sm font-bold text-indigo-700">网络搜索结果</span>
+                <span className="text-xs text-indigo-400 ml-auto">共 {msg.results.length} 条</span>
+              </div>
+              <div className="space-y-3">
+                {msg.results.map((item, i) => (
+                  <div key={i} className="bg-white/80 rounded-lg p-3 border border-indigo-100 hover:border-indigo-300 transition-colors">
+                    <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline leading-snug block">
+                      {item.title}
+                    </a>
+                    {item.snippet && (
+                      <p className="text-xs text-gray-500 mt-1 leading-relaxed line-clamp-2">{item.snippet}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // 类型: Chat2SQL 报表问数结果
+      if (msg.type === 'chat2sql_result') {
+        const isThinkingExp = expandedThinking === msg.id;
+        const trendColor = msg.result.trend === 'up' ? 'text-emerald-600' : msg.result.trend === 'down' ? 'text-red-500' : 'text-blue-600';
+        const trendIcon = msg.result.trend === 'up' ? <TrendingUp size={18} className="text-emerald-500" /> : msg.result.trend === 'down' ? <TrendingUp size={18} className="text-red-500 rotate-180" /> : <BarChart2 size={18} className="text-blue-500" />;
+        return (
+          <div key={msg.id} className="flex items-start gap-4 mb-6 w-full max-w-4xl animate-in fade-in slide-in-from-bottom-2">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-white border border-gray-200 shadow-sm">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white"><BarChart2 size={14} /></div>
+            </div>
+            <div className="flex-1 bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm p-6 relative overflow-hidden">
+              {/* 报表问数标签 */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-1 rounded-md border border-amber-200">Chat2SQL</span>
+                <span className="text-xs text-gray-400">基于数据集：{msg.datasetNames}</span>
+              </div>
+
+              {/* 思考过程 */}
+              <div className="mb-4">
+                <button
+                  onClick={() => setExpandedThinking(isThinkingExp ? null : msg.id)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-amber-600 transition-colors"
+                >
+                  {isThinkingExp ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  思考完成 <span className="text-gray-400 font-normal text-xs ml-1">(用时2.8秒)</span>
+                </button>
+                {isThinkingExp && (
+                  <div className="mt-3 ml-2 border-l-2 border-gray-100 pl-5 py-1 space-y-3 animate-in fade-in duration-200">
+                    {msg.thinkingSteps.map((step, i) => (
+                      <div key={i} className="relative">
+                        <div className={`absolute -left-[25px] top-1 w-2.5 h-2.5 rounded-full border-2 border-white ${i === msg.thinkingSteps.length - 1 ? 'bg-amber-500' : 'bg-gray-300'}`}></div>
+                        <div className="text-xs text-gray-600">
+                          <span className={`px-2 py-1 rounded mr-2 border ${i === msg.thinkingSteps.length - 1 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{step.label} (用时{step.time})</span>
+                          {step.detail}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* SQL 展示 */}
+              <div className="mb-4">
+                <details className="group">
+                  <summary className="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer hover:text-amber-600 transition-colors font-medium">
+                    <Code size={14} />
+                    查看生成的 SQL
+                    <ChevronRight size={12} className="transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="mt-2 relative">
+                    <button
+                      onClick={() => handleCopyCode(msg.sql, `sql-${msg.id}`)}
+                      className="absolute top-2 right-2 z-10 px-2 py-1 rounded text-[10px] font-medium flex items-center gap-1 bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white border border-gray-600 transition-colors"
+                    >
+                      {copiedCodeId === `sql-${msg.id}` ? <><Check size={10} /> 已复制</> : <><Copy size={10} /> 复制</>}
+                    </button>
+                    <pre className="text-xs bg-gray-900 text-gray-100 rounded-xl p-4 overflow-auto max-h-[200px] whitespace-pre-wrap">{msg.sql}</pre>
+                  </div>
+                </details>
+              </div>
+
+              {/* 结果卡片 */}
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 mb-5 border border-amber-100">
+                <div className="flex items-center gap-3 mb-2">
+                  {trendIcon}
+                  <span className="text-gray-500 text-sm font-medium">{msg.result.label}</span>
+                </div>
+                <div className={`text-[36px] font-bold tracking-tight ${trendColor}`}>
+                  {msg.result.value}
+                </div>
+              </div>
+
+              {/* 推荐追问 */}
+              <div className="flex items-start gap-3 mb-4">
+                <span className="text-sm font-bold text-gray-700 whitespace-nowrap mt-1.5">继续追问：</span>
+                <div className="flex flex-wrap gap-2">
+                  {msg.followUpQuestions.map(q => (
+                    <button key={q} onClick={() => handleSendMessage(q)} className="flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-full text-xs hover:bg-amber-100 transition-colors shadow-sm">
+                      <MessageSquare size={12} /> {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 底部操作栏 */}
+              <div className="flex items-center justify-end gap-4 text-gray-400 border-t border-gray-100 pt-3">
+                <button className="hover:text-amber-600 transition-colors"><RefreshCw size={14} /></button>
+                <button onClick={() => setMsgVotes(prev => ({...prev, [msg.id]: prev[msg.id] === 'up' ? null : 'up'}))} className={`transition-colors ${msgVotes[msg.id] === 'up' ? 'text-amber-600' : 'hover:text-amber-600'}`}><ThumbsUp size={14} /></button>
+                <button onClick={() => setMsgVotes(prev => ({...prev, [msg.id]: prev[msg.id] === 'down' ? null : 'down'}))} className={`transition-colors ${msgVotes[msg.id] === 'down' ? 'text-red-500' : 'hover:text-red-500'}`}><ThumbsDown size={14} /></button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // 类型: 数据集召回确认（HTML 页面生成流程第一步）
+      if (msg.type === 'dataset_recall') {
+        return (
+          <DatasetRecallCard key={msg.id} msg={msg} onConfirm={handleDatasetRecallConfirm} />
+        );
+      }
+
       // 类型: 无选项补充说明
       if (msg.type === 'disambiguation_3') {
         return (
@@ -2197,7 +2671,7 @@ ${messages.map(msg => {
                 </div>
                 {msg.hint && (
                   <div className="mt-5 pt-4 border-t border-blue-100">
-                     <p className="text-xs text-gray-500 whitespace-pre-wrap leading-relaxed">{msg.hint}</p>
+                    <p className="text-xs text-gray-500 whitespace-pre-wrap leading-relaxed">{msg.hint}</p>
                   </div>
                 )}
               </div>
@@ -2270,36 +2744,36 @@ ${messages.map(msg => {
 
               {/* 猜你想问 */}
               <div className="flex items-start gap-3 mb-4">
-                 <span className="text-sm font-bold text-gray-700 whitespace-nowrap mt-1.5">猜你想问：</span>
-                 <div className="flex flex-wrap gap-2">
-                   {msg.questions.map(q => (
-                     <button key={q} onClick={() => handleSendMessage(q)} className="flex items-center gap-1.5 bg-[#f4f8ff] text-[#1a73e8] border border-[#d6e4ff] px-4 py-1.5 rounded-full text-xs hover:bg-blue-100 transition-colors shadow-sm">
-                       <MessageSquare size={12} /> {q}
-                     </button>
-                   ))}
-                 </div>
+                <span className="text-sm font-bold text-gray-700 whitespace-nowrap mt-1.5">猜你想问：</span>
+                <div className="flex flex-wrap gap-2">
+                  {msg.questions.map(q => (
+                    <button key={q} onClick={() => handleSendMessage(q)} className="flex items-center gap-1.5 bg-[#f4f8ff] text-[#1a73e8] border border-[#d6e4ff] px-4 py-1.5 rounded-full text-xs hover:bg-blue-100 transition-colors shadow-sm">
+                      <MessageSquare size={12} /> {q}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* 推荐指标 */}
               <div className="flex items-start gap-3 mb-6">
-                 <span className="text-sm font-bold text-gray-700 whitespace-nowrap mt-1.5">推荐指标：</span>
-                 <div className="flex flex-wrap gap-2">
-                   {msg.metrics.map(m => (
-                     <button key={m} className="flex items-center gap-1 bg-white text-gray-600 border border-gray-200 hover:text-[#1a73e8] hover:border-blue-200 px-3 py-1.5 rounded-full text-xs transition-colors shadow-sm">
-                       <Hash size={12} className="text-[#1a73e8]" /> {m}
-                     </button>
-                   ))}
-                 </div>
+                <span className="text-sm font-bold text-gray-700 whitespace-nowrap mt-1.5">推荐指标：</span>
+                <div className="flex flex-wrap gap-2">
+                  {msg.metrics.map(m => (
+                    <button key={m} className="flex items-center gap-1 bg-white text-gray-600 border border-gray-200 hover:text-[#1a73e8] hover:border-blue-200 px-3 py-1.5 rounded-full text-xs transition-colors shadow-sm">
+                      <Hash size={12} className="text-[#1a73e8]" /> {m}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* 底部操作栏 */}
               <div className="flex items-center justify-end gap-4 text-gray-400 border-t border-gray-100 pt-4">
-                 <button className="flex items-center gap-1 text-xs hover:text-blue-600 transition-colors font-medium"><Grid size={14} /> 加入案例库</button>
-                 <button className="flex items-center gap-1 text-xs hover:text-blue-600 transition-colors font-medium"><Database size={14} /> 保存为数据集</button>
-                 <div className="h-3 w-px bg-gray-200"></div>
-                 <button className="hover:text-blue-600 transition-colors"><RefreshCw size={14} /></button>
-                 <button className="hover:text-blue-600 transition-colors"><ThumbsUp size={14} /></button>
-                 <button className="hover:text-red-500 transition-colors"><ThumbsDown size={14} /></button>
+                <button className="flex items-center gap-1 text-xs hover:text-blue-600 transition-colors font-medium"><Grid size={14} /> 加入案例库</button>
+                <button className="flex items-center gap-1 text-xs hover:text-blue-600 transition-colors font-medium"><Database size={14} /> 保存为数据集</button>
+                <div className="h-3 w-px bg-gray-200"></div>
+                <button className="hover:text-blue-600 transition-colors"><RefreshCw size={14} /></button>
+                <button className="hover:text-blue-600 transition-colors"><ThumbsUp size={14} /></button>
+                <button className="hover:text-red-500 transition-colors"><ThumbsDown size={14} /></button>
               </div>
             </div>
           </div>
@@ -2355,13 +2829,13 @@ ${messages.map(msg => {
                       <Maximize2 size={14} />
                     </button>
                   </div>
-                    <iframe
-                      title="html-preview-inline"
-                      className="w-full border-0"
-                      style={{ height: '460px' }}
-                      sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-                      src={`${publicBase}yuanqu/index.html`}
-                    />
+                  <iframe
+                    title="html-preview-inline"
+                    className="w-full border-0"
+                    style={{ height: '460px' }}
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                    src={`${publicBase}yuanqu/index.html`}
+                  />
                 </div>
               )}
 
@@ -2734,51 +3208,52 @@ ${messages.map(msg => {
                     );
                   })}
                   <div className="relative">
-                      <button
-                        onClick={() => setShowMoreApps((prev) => !prev)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
-                      >
-                        <Grid size={14} /> 更多应用
-                      </button>
-                      {showMoreApps && (
-                        <div className="absolute left-0 top-[calc(100%+8px)] w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-30">
-                          <div className="px-4 py-2 text-[11px] text-gray-400">自定义前 5 个应用</div>
-                          {appButtons.map((app) => {
-                            const Icon = app.icon;
-                            const isPreferred = preferredAppIds.includes(app.id);
-                            const isActive = app.id === generationType;
-                            return (
-                              <div
-                                key={app.id}
-                                className={`px-4 py-2 text-xs flex items-center justify-between gap-2 ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'} cursor-pointer`}
-                              >
-                                <div className="flex items-center gap-2" onClick={() => handleAppSelect(app)}>
-                                  <Icon size={14} className={app.iconClass} />
-                                  <span className={`${isActive ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>{app.label}</span>
-                                </div>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); togglePreferredApp(app.id); }}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full border ${isPreferred ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white text-gray-400 border-gray-200'}`}
-                                >
-                                  固定
-                                </button>
+                    <button
+                      onClick={() => setShowMoreApps((prev) => !prev)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 shadow-sm"
+                    >
+                      <Grid size={14} /> 更多应用
+                    </button>
+                    {showMoreApps && (
+                      <div className="absolute left-0 top-[calc(100%+8px)] w-56 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-30">
+                        <div className="px-4 py-2 text-[11px] text-gray-400">自定义前 5 个应用</div>
+                        {appButtons.map((app) => {
+                          const Icon = app.icon;
+                          const isPreferred = preferredAppIds.includes(app.id);
+                          const isActive = app.id === generationType;
+                          return (
+                            <div
+                              key={app.id}
+                              className={`px-4 py-2 text-xs flex items-center justify-between gap-2 ${isActive ? 'bg-blue-50' : 'hover:bg-gray-50'} cursor-pointer`}
+                            >
+                              <div className="flex items-center gap-2" onClick={() => handleAppSelect(app)}>
+                                <Icon size={14} className={app.iconClass} />
+                                <span className={`${isActive ? 'text-blue-700 font-medium' : 'text-gray-600'}`}>{app.label}</span>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); togglePreferredApp(app.id); }}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border ${isPreferred ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-white text-gray-400 border-gray-200'}`}
+                              >
+                                固定
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* 中央输入框 */}
               <div className="w-full max-w-4xl mb-12">
-                 {renderInputBox()}
+                {renderInputBox()}
               </div>
 
               {/* 提问示例 - 智能体模式下不显示（已在欢迎区展示） */}
               {!agentInfo && (() => {
-                const allItems = suggestionsMap[generationType] || suggestionsMap.qa;
+                const sMap = suggestionsMap || initialSuggestionsMap;
+                const allItems = sMap[generationType] || sMap.qa;
                 const visibleItems = showAllSuggestions ? allItems : allItems.slice(0, 4);
                 return (
                   <div className="w-full max-w-4xl">
@@ -3597,6 +4072,74 @@ export default function App() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const addTemplateFileRef = useRef(null);
 
+  // 提问示例管理状态
+  const [suggestionsMap, setSuggestionsMap] = useState(initialSuggestionsMap);
+  const [suggestionActiveTab, setSuggestionActiveTab] = useState('qa');
+  const [suggestionSearchQuery, setSuggestionSearchQuery] = useState('');
+  const [showAddSuggestionModal, setShowAddSuggestionModal] = useState(false);
+  const [editingSuggestion, setEditingSuggestion] = useState(null); // null=新增, {index, item}=编辑
+  const [suggestionForm, setSuggestionForm] = useState({ title: '', query: '', files: [], template: '' });
+  const [pendingDeleteSuggestion, setPendingDeleteSuggestion] = useState(null);
+  const [showSuggestionDatasetModal, setShowSuggestionDatasetModal] = useState(false);
+
+  const suggestionTabList = [
+    { key: 'qa', label: '智能问数' },
+    { key: 'report', label: '报告生成' },
+    { key: 'brief', label: '通报仿写' },
+    { key: 'explore', label: '探索分析' },
+    { key: 'html', label: 'HTML页面生成' },
+    { key: 'board', label: '智能看板' },
+  ];
+
+  const handleAddSuggestion = () => {
+    setEditingSuggestion(null);
+    setSuggestionForm({ title: '', query: '', files: [], template: '' });
+    setShowAddSuggestionModal(true);
+  };
+
+  const handleEditSuggestion = (item, index) => {
+    setEditingSuggestion({ index, item });
+    setSuggestionForm({
+      title: item.title || '',
+      query: item.query || '',
+      files: item.files && item.files.length > 0 ? item.files.map(f => ({ name: f.name, size: f.size })) : [],
+      template: item.template || '',
+    });
+    setShowAddSuggestionModal(true);
+  };
+
+  const handleSaveSuggestion = () => {
+    if (!suggestionForm.title.trim() || !suggestionForm.query.trim()) return;
+    const newItem = {
+      title: suggestionForm.title.trim(),
+      query: suggestionForm.query.trim(),
+      files: suggestionForm.files,
+    };
+    if (suggestionActiveTab === 'html' && suggestionForm.template.trim()) {
+      newItem.template = suggestionForm.template.trim();
+    }
+    setSuggestionsMap(prev => {
+      const list = [...(prev[suggestionActiveTab] || [])];
+      if (editingSuggestion !== null) {
+        list[editingSuggestion.index] = newItem;
+      } else {
+        list.push(newItem);
+      }
+      return { ...prev, [suggestionActiveTab]: list };
+    });
+    setShowAddSuggestionModal(false);
+  };
+
+  const handleDeleteSuggestion = () => {
+    if (pendingDeleteSuggestion === null) return;
+    setSuggestionsMap(prev => {
+      const list = [...(prev[suggestionActiveTab] || [])];
+      list.splice(pendingDeleteSuggestion, 1);
+      return { ...prev, [suggestionActiveTab]: list };
+    });
+    setPendingDeleteSuggestion(null);
+  };
+
   const handleAddTemplateFile = (file) => {
     if (file && file.name.endsWith('.html')) {
       setNewTemplateFile(file);
@@ -3683,6 +4226,9 @@ export default function App() {
     } else if (currentView === 'html-template-manage') {
       crumbs.push({ label: '报告管理' });
       crumbs.push({ label: 'HTML模版管理' });
+    } else if (currentView === 'suggestion-manage') {
+      crumbs.push({ label: '运营管理' });
+      crumbs.push({ label: '提问示例管理' });
     }
     return crumbs;
   };
@@ -3702,7 +4248,7 @@ export default function App() {
               <h3 className="text-xl font-bold text-gray-800 mb-2">ChatBI 小程序体验</h3>
               <p className="text-sm text-gray-500 mb-6">请使用微信扫描下方二维码</p>
               <div className="bg-white border-2 border-gray-100 rounded-xl p-2 inline-block shadow-sm">
-                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://chatbi.example.com" alt="QR Code" className="w-48 h-48 rounded-lg" />
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://chatbi.example.com" alt="QR Code" className="w-48 h-48 rounded-lg" />
               </div>
             </div>
           </div>
@@ -3715,12 +4261,12 @@ export default function App() {
         <div className="p-4 min-w-[18rem]">
           <button onClick={newChat} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 text-sm font-medium mb-6 group"><Plus size={18} /> 新建对话</button>
           <div className="space-y-2 mb-6">
-             <div onClick={() => setCurrentView('chat-agent-1')} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${currentView === 'chat-agent-1' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-transparent'}`}>
-               <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center text-blue-500"><User size={14} /></div><span className="text-sm text-gray-700">舆情分析助手</span></div>
-             </div>
-             <div onClick={() => setCurrentView('agents')} className="flex items-center justify-between p-2 bg-white border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:text-blue-600 text-gray-500 mt-2">
-               <div className="flex items-center gap-2"><Grid size={14} /><span className="text-sm font-medium">更多 BI 智能体</span></div><ChevronRight size={14} />
-             </div>
+            <div onClick={() => setCurrentView('chat-agent-1')} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border ${currentView === 'chat-agent-1' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-transparent'}`}>
+              <div className="flex items-center gap-2"><div className="w-6 h-6 bg-blue-100 rounded flex items-center justify-center text-blue-500"><User size={14} /></div><span className="text-sm text-gray-700">舆情分析助手</span></div>
+            </div>
+            <div onClick={() => setCurrentView('agents')} className="flex items-center justify-between p-2 bg-white border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:text-blue-600 text-gray-500 mt-2">
+              <div className="flex items-center gap-2"><Grid size={14} /><span className="text-sm font-medium">更多 BI 智能体</span></div><ChevronRight size={14} />
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-2 min-w-[18rem]">
@@ -3729,10 +4275,10 @@ export default function App() {
             <div className="relative mb-3"><Search size={14} className="absolute left-3 top-2.5 text-gray-400" /><input type="text" placeholder="搜索历史记录" className="w-full bg-gray-50 border border-gray-200 rounded-full pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:border-indigo-500" /></div>
           </div>
           {historyData.map((item, i) => (
-             <div key={i} className="p-3 hover:bg-gray-100 rounded-lg cursor-pointer group relative">
-               <div className="text-sm text-gray-700 font-medium mb-1 truncate pr-6">{item.title}</div>
-               <div className="text-xs text-gray-400">{item.date}</div>
-             </div>
+            <div key={i} className="p-3 hover:bg-gray-100 rounded-lg cursor-pointer group relative">
+              <div className="text-sm text-gray-700 font-medium mb-1 truncate pr-6">{item.title}</div>
+              <div className="text-xs text-gray-400">{item.date}</div>
+            </div>
           ))}
         </div>
       </div>
@@ -3757,7 +4303,7 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-              <div className="relative">
+            <div className="relative">
               <div
                 className="relative cursor-pointer p-1.5 rounded hover:bg-gray-100"
                 onClick={() => {
@@ -3794,10 +4340,10 @@ export default function App() {
             <button onClick={() => setShowQrCodeModal(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><QrCode size={16} /><span className="hidden sm:inline">小程序体验</span></button>
           </div>
         </div>
-        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} />}
+        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} />}
         {currentView === 'agent-manage' && <AgentManageView onNavigate={setCurrentView} />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
-        {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} />}
+        {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} />}
         {currentView === 'report-favorite' && (
           <div className="flex-1 overflow-y-auto p-8">
             <div className="max-w-4xl mx-auto">
@@ -3974,7 +4520,265 @@ export default function App() {
             </div>
           </div>
         )}
+        {currentView === 'suggestion-manage' && (() => {
+          const currentTabItems = suggestionsMap[suggestionActiveTab] || [];
+          const filteredItems = suggestionSearchQuery
+            ? currentTabItems.filter(item =>
+              item.title.toLowerCase().includes(suggestionSearchQuery.toLowerCase()) ||
+              item.query.toLowerCase().includes(suggestionSearchQuery.toLowerCase())
+            )
+            : currentTabItems;
+          return (
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="max-w-5xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-500"><Lightbulb size={20} /></div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-800">提问示例管理</h2>
+                      <p className="text-sm text-gray-400">管理各模块首页展示的提问示例</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={suggestionSearchQuery}
+                        onChange={(e) => setSuggestionSearchQuery(e.target.value)}
+                        placeholder="搜索标题或内容"
+                        className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm w-56 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
+                      />
+                    </div>
+                    <button
+                      onClick={handleAddSuggestion}
+                      className="px-4 py-2 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Plus size={16} /> 添加示例
+                    </button>
+                  </div>
+                </div>
+                {/* Tab 栏 */}
+                <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+                  {suggestionTabList.map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => { setSuggestionActiveTab(tab.key); setSuggestionSearchQuery(''); }}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${suggestionActiveTab === tab.key ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                {/* 表格 */}
+                {filteredItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+                    <Lightbulb size={48} className="mb-4 text-gray-200" />
+                    <div className="text-base font-medium mb-1">{suggestionSearchQuery ? '未找到匹配的示例' : '暂无提问示例'}</div>
+                    <div className="text-sm">{suggestionSearchQuery ? '请尝试其他关键词' : '点击"添加示例"按钮添加'}</div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 text-gray-500 text-xs bg-gray-50/50">
+                          <th className="text-left px-6 py-3 font-medium w-[140px]">标题</th>
+                          <th className="text-left px-4 py-3 font-medium">提问内容</th>
+                          <th className="text-left px-4 py-3 font-medium w-[200px]">关联数据集</th>
+                          {suggestionActiveTab === 'html' && <th className="text-left px-4 py-3 font-medium w-[120px]">模版</th>}
+                          <th className="text-right px-6 py-3 font-medium w-[100px]">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredItems.map((item, idx) => {
+                          const originalIdx = currentTabItems.indexOf(item);
+                          return (
+                            <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-3">
+                                <span className="font-medium text-gray-700">{item.title}</span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600 truncate max-w-[300px]">{item.query}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-1">
+                                  {(item.files || []).length === 0 ? <span className="text-xs text-gray-300">-</span> : (item.files || []).map((f, fi) => (
+                                    <div key={fi} className="flex items-center gap-1 text-xs text-gray-500">
+                                      <Database size={11} className="text-blue-400 flex-shrink-0" />
+                                      <span className="truncate max-w-[160px]">{f.name}</span>
+                                      {f.size && <span className="text-gray-300">({f.size})</span>}
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              {suggestionActiveTab === 'html' && <td className="px-4 py-3 text-gray-500 text-xs">{item.template || '-'}</td>}
+                              <td className="px-6 py-3">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    onClick={() => handleEditSuggestion(item, originalIdx)}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    title="编辑"
+                                  ><Pencil size={14} /></button>
+                                  <button
+                                    onClick={() => setPendingDeleteSuggestion(originalIdx)}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    title="删除"
+                                  ><Trash2 size={14} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
+
+      {/* 添加/编辑示例弹窗 */}
+      {showAddSuggestionModal && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setShowAddSuggestionModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[560px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                {editingSuggestion ? <Pencil size={18} className="text-amber-500" /> : <Plus size={18} className="text-amber-500" />}
+                {editingSuggestion ? '编辑示例' : '添加示例'}
+                <span className="text-sm font-normal text-gray-400 ml-2">({suggestionTabList.find(t => t.key === suggestionActiveTab)?.label})</span>
+              </h3>
+              <button onClick={() => setShowAddSuggestionModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">标题 <span className="text-red-400">*</span></label>
+              <input
+                type="text"
+                value={suggestionForm.title}
+                onChange={(e) => setSuggestionForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="例如：指标查询"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
+                autoFocus
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700 mb-1.5 block">提问内容 <span className="text-red-400">*</span></label>
+              <textarea
+                value={suggestionForm.query}
+                onChange={(e) => setSuggestionForm(prev => ({ ...prev, query: e.target.value }))}
+                placeholder="例如：收入情况如何？"
+                rows={2}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400 resize-none"
+              />
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700">关联数据集</label>
+                <button
+                  onClick={() => setShowSuggestionDatasetModal(true)}
+                  className="text-xs text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+                >
+                  <Database size={12} /> 选择数据集
+                </button>
+              </div>
+              {suggestionForm.files.length > 0 ? (
+                <div className="border border-gray-200 rounded-xl p-3 space-y-2">
+                  {suggestionForm.files.map((f, fi) => (
+                    <div key={fi} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <Database size={14} className="text-blue-500 flex-shrink-0" />
+                        <span className="font-medium truncate max-w-[280px]">{f.name}</span>
+                        {f.size && <span className="text-xs text-gray-400">({f.size})</span>}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const newFiles = suggestionForm.files.filter((_, i) => i !== fi);
+                          setSuggestionForm(prev => ({ ...prev, files: newFiles }));
+                        }}
+                        className="p-1 text-gray-400 hover:text-red-500 flex-shrink-0"
+                      ><X size={14} /></button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  className="border-2 border-dashed border-gray-200 rounded-xl px-4 py-6 text-center cursor-pointer hover:border-amber-300 hover:bg-amber-50/30 transition-colors"
+                  onClick={() => setShowSuggestionDatasetModal(true)}
+                >
+                  <Database size={24} className="mx-auto mb-2 text-gray-300" />
+                  <div className="text-sm text-gray-500">点击选择关联数据集</div>
+                </div>
+              )}
+            </div>
+
+            {suggestionActiveTab === 'html' && (
+              <div className="mb-4">
+                <label className="text-sm font-medium text-gray-700 mb-1.5 block">模版名称</label>
+                <input
+                  type="text"
+                  value={suggestionForm.template}
+                  onChange={(e) => setSuggestionForm(prev => ({ ...prev, template: e.target.value }))}
+                  placeholder="例如：通用仪表盘"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-400"
+                />
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-5">
+              <button onClick={() => setShowAddSuggestionModal(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={handleSaveSuggestion}
+                disabled={!suggestionForm.title.trim() || !suggestionForm.query.trim()}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {editingSuggestion ? <Pencil size={14} /> : <Plus size={14} />}
+                {editingSuggestion ? '确认修改' : '确认添加'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 删除示例确认弹窗 */}
+      {pendingDeleteSuggestion !== null && (
+        <div className="fixed inset-0 bg-black/40 z-[100] flex items-center justify-center" onClick={() => setPendingDeleteSuggestion(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-[400px] p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"><Trash2 size={20} className="text-red-500" /></div>
+              <h3 className="text-lg font-bold text-gray-800">确认删除示例</h3>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5">
+              <p className="text-sm text-red-700 leading-relaxed">删除后该提问示例将永久移除，此操作不可撤销。</p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setPendingDeleteSuggestion(null)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button
+                onClick={handleDeleteSuggestion}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              >
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 示例管理-数据集选择弹窗 */}
+      {showSuggestionDatasetModal && (
+        <DatasetSelectionModal
+          onClose={() => setShowSuggestionDatasetModal(false)}
+          onConfirm={(selectedDatasets) => {
+            const newFiles = selectedDatasets.map(ds => ({ name: ds.name, size: '' }));
+            setSuggestionForm(prev => ({
+              ...prev,
+              files: [...prev.files, ...newFiles.filter(nf => !prev.files.some(cf => cf.name === nf.name))]
+            }));
+            setShowSuggestionDatasetModal(false);
+          }}
+        />
+      )}
 
       {/* 添加模版弹窗 */}
       {showAddTemplateModal && (

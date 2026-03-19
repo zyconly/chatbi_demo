@@ -5,4 +5,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/chatbi_demo/',
+  server: {
+    proxy: {
+      '/api/serpapi': {
+        target: 'https://serpapi.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/serpapi/, ''),
+      },
+    },
+  },
 })
