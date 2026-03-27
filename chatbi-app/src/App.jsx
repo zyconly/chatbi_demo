@@ -58,6 +58,9 @@ import {
   Table,
   Hash,
   Calendar,
+  Clock,
+  AlertTriangle,
+  Target,
   CheckSquare,
   Square,
   BarChart2,
@@ -92,6 +95,17 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import ipMascot from './assets/img.png';
 import { searchWeb } from './searchService';
+import BeautifulDashboard from './components/BeautifulDashboard';
+import BOARD_THEMES from './constants/boardThemes';
+import BoardKpiCards from './components/board/BoardKpiCards';
+import BoardChartsRow from './components/board/BoardChartsRow';
+import BoardDataTable from './components/board/BoardDataTable';
+import BoardInsightsSummary from './components/board/BoardInsightsSummary';
+import BoardBuildProgress from './components/board/BoardBuildProgress';
+import BoardToolbar from './components/board/BoardToolbar';
+import BoardThemeSelector from './components/board/BoardThemeSelector';
+// BoardCommandCenter removed — replaced by slash command menu in input box
+import BoardDataPanel from './components/board/BoardDataPanel';
 
 // --- 样式注入 ---
 const styles = `
@@ -461,7 +475,8 @@ const menuStructure = [
     type: 'submenu',
     children: [
       { id: 'report-favorite', label: '报告收藏', type: 'item', view: 'report-favorite' },
-      { id: 'html-template-manage', label: 'HTML模版管理', type: 'item', view: 'html-template-manage' }
+      { id: 'html-template-manage', label: 'HTML模版管理', type: 'item', view: 'html-template-manage' },
+      { id: 'board-manage', label: '看板管理', type: 'item', view: 'board-manage' }
     ]
   },
   {
@@ -723,7 +738,22 @@ const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
         }
 
         // --- Default: generate dashboard ---
-        const title = query.includes('经营') ? '经营分析看板' : query.includes('宽带') ? '宽带业务看板' : query.includes('营业厅') ? '营业厅业绩看板' : query.slice(0, 10) + '看板';
+        let title = '默认业务看板';
+        const matchTitle = query.match(/名为[“"']([^”"']+)[”"']/);
+        if (matchTitle) {
+          title = matchTitle[1];
+        } else if (query.includes('经营')) { 
+          title = '月度经营分析看板'; 
+        } else if (query.includes('宽带')) { 
+          title = '宽带业务看板'; 
+        } else if (query.includes('营业厅')) { 
+          title = '营业厅业绩看板'; 
+        } else if (query.includes('流失')) {
+          title = '流失用户洞察看板';
+        } else {
+          title = query.slice(0, 15) + '...';
+        }
+
         const initFilters = filterDefs.filter(f => f.keywords.some(kw => q.includes(kw))).map(f => ({ type: f.type, label: f.label }));
         resolve({
           type: 'board_dashboard',
@@ -1128,6 +1158,73 @@ const BOARD_ALL_COLUMNS = {
 
 const BOARD_DEFAULT_COLUMNS = ['date', 'area', 'grid', 'hall', 'newCount', 'newRevenue', 'broadbandCount', 'broadbandRevenue'];
 
+// Slash commands for board mode — 完整对齐 Quick BI 小Q搭建 指令支持列表
+// https://help.aliyun.com/zh/quick-bi/user-guide/supported-directives
+const BOARD_SLASH_COMMANDS = [
+  // ── 创建图表/报表 ──
+  { cmd: '/创建图表', label: '创建图表', desc: '通过自然语言描述分析需求，AI 自动创建对应图表', category: '图表', icon: 'BarChart2' },
+  { cmd: '/修改图表类型', label: '修改图表类型', desc: '切换图表组件的类型（柱状图/折线图/饼图等）', category: '图表', icon: 'BarChart' },
+  { cmd: '/修改图表标题', label: '修改图表标题', desc: '显示/隐藏组件标题，或修改图表标题内容', category: '图表', icon: 'Pencil' },
+  { cmd: '/一键生成报表', label: '一键生成报表', desc: '基于已保存的数据集，进行数据分析，快速生成报表', category: '图表', icon: 'Sparkles' },
+  { cmd: '/修改报表标题', label: '修改报表标题', desc: '修改仪表板标题名称', category: '图表', icon: 'Pencil' },
+  { cmd: '/添加指定类型图表', label: '添加指定类型图表', desc: '向仪表板中添加一个指定类型的组件', category: '图表', icon: 'Plus' },
+  { cmd: '/删除图表', label: '删除图表', desc: '删除仪表板中的某个组件，或仅保留指定组件', category: '图表', icon: 'Trash2' },
+  // ── 调整数据 ──
+  { cmd: '/修改图表字段', label: '修改图表字段', desc: '修改图表的数据字段内容', category: '数据', icon: 'Database' },
+  { cmd: '/修改字段展示名称', label: '修改字段展示名称', desc: '修改字段在当前图表中的展示名称', category: '数据', icon: 'Pencil' },
+  { cmd: '/添加字段描述', label: '添加字段描述', desc: '修改字段在当前图表中的描述信息', category: '数据', icon: 'FileText' },
+  { cmd: '/添加字段后缀', label: '添加字段后缀', desc: '为字段添加后缀信息，常用于添加指标单位', category: '数据', icon: 'Hash' },
+  { cmd: '/修改字段聚合方式', label: '修改字段聚合方式', desc: '修改字段的统计方式（求和/计数/均值等）', category: '数据', icon: 'Layers' },
+  { cmd: '/修改字段排序', label: '修改字段排序', desc: '按照需要的顺序重新排列数据', category: '数据', icon: 'List' },
+  { cmd: '/修改数据格式', label: '修改数据格式', desc: '按照展示需求修改数据格式（小数位/百分比等）', category: '数据', icon: 'Hash' },
+  { cmd: '/添加同环比', label: '添加同环比', desc: '通过查看同环比数据，观测数据变动', category: '数据', icon: 'TrendingUp' },
+  { cmd: '/添加总计', label: '添加总计', desc: '展示数据汇总值', category: '数据', icon: 'Hash' },
+  { cmd: '/添加小计', label: '添加小计', desc: '展示数据在不同类别下的小计数据', category: '数据', icon: 'Hash' },
+  { cmd: '/添加目标', label: '添加目标', desc: '为 KPI 添加目标值以展示进度', category: '数据', icon: 'Target' },
+  { cmd: '/修改组合图字段展示样式', label: '修改组合图展示样式', desc: '修改字段展示样式，可切换线、柱、面', category: '数据', icon: 'BarChart' },
+  // ── 辅助分析 ──
+  { cmd: '/条件格式', label: '条件格式', desc: '设定数据范围高亮异常数据，快速发现业务异常', category: '辅助分析', icon: 'Palette' },
+  { cmd: '/辅助线', label: '辅助线', desc: '查看当前度量值与参考值（均值/目标等）的差异', category: '辅助分析', icon: 'TrendingUp' },
+  { cmd: '/趋势线', label: '趋势线', desc: '预测数据的整体发展趋势', category: '辅助分析', icon: 'TrendingUp' },
+  { cmd: '/最值', label: '最值', desc: '查看最大/最小值，掌握数据极限分布', category: '辅助分析', icon: 'Maximize2' },
+  { cmd: '/标注', label: '标注', desc: '设定数据范围高亮关注的数据内容', category: '辅助分析', icon: 'Pencil' },
+  { cmd: '/自动联动', label: '自动联动', desc: '开启后同数据集下图表自动关联交互', category: '辅助分析', icon: 'Link' },
+  // ── 查询筛选 ──
+  { cmd: '/添加查询控件', label: '添加查询控件', desc: '添加查询控件，筛选部分条件下的数据进行分析', category: '查询筛选', icon: 'Filter' },
+  { cmd: '/查询控件置顶', label: '查询控件置顶', desc: '保持查询控件吸顶', category: '查询筛选', icon: 'Filter' },
+  // ── 智能洞察 ──
+  { cmd: '/智能洞察', label: '智能洞察', desc: '自动生成报表摘要，分析波动原因', category: '智能洞察', icon: 'Lightbulb' },
+  // ── 样式美化 ──
+  { cmd: '/智能美化', label: '智能美化', desc: '自动完成报表美化，可选择内置风格或上传企业 Logo', category: '样式美化', icon: 'Wand2' },
+  { cmd: '/编辑报表主题', label: '编辑报表主题', desc: '编辑仪表板主题风格', category: '样式美化', icon: 'Palette' },
+  { cmd: '/编辑报表背景颜色', label: '编辑报表背景颜色', desc: '编辑仪表板背景颜色', category: '样式美化', icon: 'Palette' },
+  { cmd: '/编辑报表图表间距', label: '编辑报表图表间距', desc: '编辑仪表板图表间距', category: '样式美化', icon: 'Grid' },
+  { cmd: '/编辑报表字体类型', label: '编辑报表字体类型', desc: '编辑仪表板字体类型', category: '样式美化', icon: 'Type' },
+  { cmd: '/编辑组件背景颜色', label: '编辑组件背景颜色', desc: '编辑组件的背景颜色', category: '样式美化', icon: 'Palette' },
+  { cmd: '/编辑组件视觉要素配色', label: '编辑视觉要素配色', desc: '编辑组件视觉要素的配色（如线图线条颜色）', category: '样式美化', icon: 'Palette' },
+  { cmd: '/开启关闭数据标签', label: '开启/关闭数据标签', desc: '开启或关闭数据标签', category: '样式美化', icon: 'Eye' },
+  { cmd: '/切换线条展示类型', label: '切换线条展示类型', desc: '切换线条展示类型（直线/曲线）', category: '样式美化', icon: 'TrendingUp' },
+  { cmd: '/编辑柱图柱体宽度', label: '编辑柱图柱体宽度', desc: '编辑柱图的柱体宽度', category: '样式美化', icon: 'BarChart' },
+  { cmd: '/开启关闭表格序号列', label: '开启/关闭表格序号列', desc: '开启或关闭表格序号列', category: '样式美化', icon: 'List' },
+  { cmd: '/编辑字段对齐方式', label: '编辑字段对齐方式', desc: '编辑字段水平和垂直对齐方式', category: '样式美化', icon: 'Type' },
+  { cmd: '/显示隐藏表头', label: '显示/隐藏表头', desc: '显示或隐藏表头信息', category: '样式美化', icon: 'Eye' },
+  { cmd: '/编辑表头字体样式', label: '编辑表头字体样式', desc: '编辑表头字体样式', category: '样式美化', icon: 'Type' },
+  { cmd: '/显示隐藏指标名称', label: '显示/隐藏指标名称', desc: '显示或隐藏指标名称', category: '样式美化', icon: 'Eye' },
+  { cmd: '/显示隐藏维值名称', label: '显示/隐藏维值名称', desc: '显示或隐藏维度值名称', category: '样式美化', icon: 'Eye' },
+  { cmd: '/修改指标看板布局', label: '修改指标看板布局', desc: '调整展示布局，选择主副关系展示或并列平铺', category: '样式美化', icon: 'Grid' },
+  { cmd: '/开启关闭指标修饰图', label: '开启/关闭指标修饰图', desc: '为指标增加修饰图使其更符合样式需求', category: '样式美化', icon: 'Sparkles' },
+  { cmd: '/编辑轴标题和单位', label: '编辑轴标题和单位', desc: '编辑轴标题和单位（常用于 Y 轴多指标场景）', category: '样式美化', icon: 'Type' },
+  { cmd: '/编辑轴标签显示规则', label: '编辑轴标签显示规则', desc: '编辑轴标签展示疏密（最多/稀疏/智能展示）', category: '样式美化', icon: 'Type' },
+  { cmd: '/修改表头背景色', label: '修改表头背景色', desc: '编辑表头背景样式', category: '样式美化', icon: 'Palette' },
+  { cmd: '/配置进度条展示布局', label: '配置进度条展示布局', desc: '编辑每行展示进度条的个数', category: '样式美化', icon: 'Grid' },
+  // ── 报表操作 ──
+  { cmd: '/开启关闭水印', label: '开启/关闭水印', desc: '开启或关闭仪表板水印', category: '报表操作', icon: 'Eye' },
+  { cmd: '/保存', label: '保存仪表板', desc: '保存仪表板内容', category: '报表操作', icon: 'Save' },
+  { cmd: '/发布', label: '发布仪表板', desc: '发布仪表板，发布后访问者可查看内容', category: '报表操作', icon: 'Send' },
+  { cmd: '/分享', label: '分享仪表板', desc: '将仪表板分享给他人', category: '报表操作', icon: 'Share2' },
+  { cmd: '/导出', label: '导出', desc: '导出为 PNG/PDF/Excel', category: '报表操作', icon: 'Download' },
+];
+
 const DASHBOARD_MOCK_DATA = (() => {
   const areas = Object.keys(LOCATION_HIERARCHY);
   const rows = [];
@@ -1166,7 +1263,7 @@ const DASHBOARD_MOCK_DATA = (() => {
 
 // SmartBuilderView removed — board mode is now handled inline in HomeView
 
-const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, setFavoriteReports, agentInfo, suggestionsMap }) => (
+const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, setFavoriteReports, agentInfo, suggestionsMap, setIsNavCollapsed, setIsChatCollapsed }) => (
   <HomeView
     onNavigate={onNavigate || (() => { })}
     favoriteReports={favoriteReports}
@@ -1174,6 +1271,8 @@ const ChatAgentView = ({ onBack, onNavigate, onGenTypeChange, favoriteReports, s
     agentInfo={agentInfo || { name: '舆情分析助手', desc: '智能化舆情监测与分析，实时掌握网络动态，精准洞察公众情绪，为决策提供数据支持' }}
     onGenTypeChange={onGenTypeChange}
     suggestionsMap={suggestionsMap}
+    setIsNavCollapsed={setIsNavCollapsed}
+    setIsChatCollapsed={setIsChatCollapsed}
   />
 );
 
@@ -1518,7 +1617,7 @@ const DatasetRecallCard = ({ msg, onConfirm }) => {
 };
 
 // --- HomeView：集成多轮对话流引擎 ---
-const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, suggestionsMap }) => {
+const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, suggestionsMap, setIsNavCollapsed, setIsChatCollapsed }) => {
   const [inputText, setInputText] = useState('');
   const [activeFiles, setActiveFiles] = useState([{ name: '用户通信费用日表.csv', size: '13.39k' }]);
   const [messages, setMessages] = useState([]);
@@ -1529,7 +1628,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
     setGenerationTypeRaw(val);
     onGenTypeChange?.(val);
     // Reset board state when switching away
-    if (val !== 'board') { setBoardDashboardVisible(false); setBoardStreamingMsgId(null); setBoardSteps([]); setBoardStreamingText(''); setBoardFilters([]); setBoardColumns(BOARD_DEFAULT_COLUMNS); setBoardContextMenu(null); }
+    if (val !== 'board') { setBoardDashboardVisible(false); setBoardStreamingMsgId(null); setBoardSteps([]); setBoardStreamingText(''); setBoardFilters([]); setBoardColumns(BOARD_DEFAULT_COLUMNS); setBoardContextMenu(null); setBoardBuildStage(-1); setShowThemeSelector(false); }
   };
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [showDatasetModal, setShowDatasetModal] = useState(false);
@@ -1574,6 +1673,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   // Board (智能看板) state
   const [boardDashboardVisible, setBoardDashboardVisible] = useState(false);
   const [boardTitle, setBoardTitle] = useState('');
+  const [boardDesc, setBoardDesc] = useState('');
   const [boardStreamingText, setBoardStreamingText] = useState('');
   const [boardStreamingMsgId, setBoardStreamingMsgId] = useState(null);
   const [boardSteps, setBoardSteps] = useState([]);
@@ -1588,6 +1688,29 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
   const [htmlFullscreen, setHtmlFullscreen] = useState(false);
   const [htmlQueryMode, setHtmlQueryMode] = useState(false); // 报表问数模式
+  const [boardFormName, setBoardFormName] = useState('');
+  const [boardFormDesc, setBoardFormDesc] = useState('');
+  const [showBoardCreateModal, setShowBoardCreateModal] = useState(false);
+  // New board enhancement states
+  const [boardThemeKey, setBoardThemeKey] = useState('techBlue');
+  const [boardTheme, setBoardTheme] = useState(BOARD_THEMES.techBlue);
+  const [boardBuildStage, setBoardBuildStage] = useState(-1); // -1=not started, 0-4=stages
+  const [boardInsightsVisible, setBoardInsightsVisible] = useState(true);
+  const [showBoardPublishModal, setShowBoardPublishModal] = useState(false);
+  const [showBoardScheduleModal, setShowBoardScheduleModal] = useState(false);
+  const [boardSaveToast, setBoardSaveToast] = useState(false);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [boardPublishScope, setBoardPublishScope] = useState('self');
+  const [boardPublishDesc, setBoardPublishDesc] = useState('');
+  const [boardScheduleFreq, setBoardScheduleFreq] = useState('daily');
+  const [boardScheduleTime, setBoardScheduleTime] = useState('08:00');
+  const [boardScheduleNotify, setBoardScheduleNotify] = useState('email');
+  const [boardChartType, setBoardChartType] = useState('table');
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashFilter, setSlashFilter] = useState('');
+  const [slashSelectedIdx, setSlashSelectedIdx] = useState(0);
+  const [boardListSearch, setBoardListSearch] = useState('');
+  const [boardListTag, setBoardListTag] = useState('全部');
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -2087,10 +2210,64 @@ ${messages.map(msg => {
       setActiveArtifact('sql');
     }, 1200);
   };
+  
+  const handleCreateBoard = () => {
+    if (!boardFormName.trim() || !boardFormDesc.trim()) return;
+    const prompt = `帮我创建一个名为“${boardFormName}”的看板。需求描述：${boardFormDesc}`;
+    setShowBoardCreateModal(false);
+    setBoardTitle(boardFormName);
+    setBoardDesc(boardFormDesc);
+    setBoardFormName('');
+    setBoardFormDesc('');
+    handleSendMessage(prompt);
+  };
+
+  const boardTemplates = [
+    { name: '流失用户洞察看板', desc: '深度剖析用户流失的关键因素、流失率趋势以及高危人群画像，辅助制定精准挽留策略。', type: 'pie' },
+    { name: '月度经营分析看板', desc: '全面监控公司各项业务收入、成本及利润达成进度，支持多维下钻排查指标差异。', type: 'bar' },
+    { name: '各属地新增业务排名', desc: '按属地维度对比新增办理量与收入排名，快速定位头部与末位区域差距。', type: 'bar' },
+    { name: '宽带收入异常下降检测', desc: '自动检测宽带收入环比异常下降的区域与时段，辅助归因分析。', type: 'line' },
+    { name: '营业厅业绩排名与达标率', desc: '各营业厅业绩指标排名及目标达标率对比，识别优秀与待改进厅店。', type: 'bar' },
+    { name: '区县维度收入占比及同比', desc: '按区县展示各业务收入占比，结合同比数据洞察增长趋势。', type: 'pie' },
+  ];
+
+  // Mock saved boards for board list view
+  const SAVED_BOARDS = [
+    { id: 1, name: '流失用户洞察看板', tags: ['用户分析', '流失'], updatedAt: '2026-03-20 14:30:00', creator: '张三', status: 'published', type: 'pie' },
+    { id: 2, name: '月度经营分析看板', tags: ['经营分析'], updatedAt: '2026-03-19 10:15:00', creator: '管理员', status: 'published', type: 'bar' },
+    { id: 3, name: '各属地新增业务排名', tags: ['业务排名', '属地'], updatedAt: '2026-03-18 16:22:00', creator: '李四', status: 'published', type: 'bar' },
+    { id: 4, name: '宽带收入异常下降检测', tags: ['宽带', '异常检测'], updatedAt: '2026-03-17 09:45:00', creator: '王五', status: 'draft', type: 'line' },
+    { id: 5, name: '营业厅业绩排名与达标率', tags: ['营业厅', '业绩'], updatedAt: '2026-03-16 11:30:00', creator: '管理员', status: 'published', type: 'bar' },
+    { id: 6, name: '区县维度收入占比及同比', tags: ['区县', '收入'], updatedAt: '2026-03-15 15:00:00', creator: '张三', status: 'published', type: 'pie' },
+    { id: 7, name: '高价值用户画像分析', tags: ['用户分析', '画像'], updatedAt: '2026-03-14 13:20:00', creator: '李四', status: 'draft', type: 'pie' },
+    { id: 8, name: '渠道转化漏斗分析', tags: ['渠道', '转化'], updatedAt: '2026-03-13 08:50:00', creator: '王五', status: 'published', type: 'bar' },
+    { id: 9, name: '5G套餐迁移趋势监控', tags: ['5G', '套餐'], updatedAt: '2026-03-12 17:10:00', creator: '管理员', status: 'published', type: 'line' },
+    { id: 10, name: '客户满意度NPS追踪', tags: ['满意度', 'NPS'], updatedAt: '2026-03-11 14:00:00', creator: '张三', status: 'draft', type: 'line' },
+    { id: 11, name: '投诉工单热力分析', tags: ['投诉', '工单'], updatedAt: '2026-03-10 10:30:00', creator: '李四', status: 'published', type: 'bar' },
+    { id: 12, name: '资费套餐收入结构', tags: ['资费', '收入'], updatedAt: '2026-03-09 09:15:00', creator: '王五', status: 'published', type: 'pie' },
+  ];
+
+  const boardListTags = ['全部', ...new Set(SAVED_BOARDS.flatMap(b => b.tags))];
+  const filteredBoards = SAVED_BOARDS.filter(b => {
+    const matchSearch = !boardListSearch || b.name.includes(boardListSearch) || b.tags.some(t => t.includes(boardListSearch));
+    const matchTag = boardListTag === '全部' || b.tags.includes(boardListTag);
+    return matchSearch && matchTag;
+  });
+
+  const handleTemplateClick = (tpl) => {
+    const prompt = `帮我创建一个名为"${tpl.name}"的看板。需求描述：${tpl.desc}`;
+    setBoardTitle(tpl.name);
+    setBoardDesc(tpl.desc);
+    handleSendMessage(prompt);
+  };
 
   const handleSendMessage = async (textOverride) => {
     const text = textOverride || inputText;
     if (!text.trim()) return;
+
+    // 自动折叠侧边栏和历史记录
+    if (setIsNavCollapsed) setIsNavCollapsed(true);
+    if (setIsChatCollapsed) setIsChatCollapsed(true);
 
     const newUserMsg = { id: Date.now(), role: 'user', content: text };
     setMessages(prev => [...prev, newUserMsg]);
@@ -2266,8 +2443,8 @@ ${messages.map(msg => {
           setIsLoading(false);
         }, 2000);
       } else {
-        // Initial dashboard generation
-        const stepTexts = ['正在分析需求...', '正在生成看板组件...', '看板已生成，请在右侧查看'];
+        // Initial dashboard generation — 5 stages
+        const stepTexts = ['正在分析需求...', '正在进行数据建模...', '正在生成图表...', '正在智能美化...', '正在洞察分析...'];
         let charIdx = 0;
         const streamTimer = setInterval(() => {
           charIdx += 1;
@@ -2275,26 +2452,30 @@ ${messages.map(msg => {
           if (charIdx >= fullReply.length) clearInterval(streamTimer);
         }, 18);
 
-        setTimeout(() => setBoardSteps([stepTexts[0]]), 300);
-        setTimeout(() => setBoardSteps([stepTexts[0], stepTexts[1]]), 1200);
+        setBoardBuildStage(0);
+        setTimeout(() => { setBoardSteps([stepTexts[0]]); setBoardBuildStage(0); }, 300);
+        setTimeout(() => { setBoardSteps([stepTexts[0], stepTexts[1]]); setBoardBuildStage(1); }, 900);
+        setTimeout(() => { setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2]]); setBoardBuildStage(2); }, 1500);
+        setTimeout(() => { setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2], stepTexts[3]]); setBoardBuildStage(3); }, 2100);
         setTimeout(() => {
-          setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2]]);
+          setBoardSteps([stepTexts[0], stepTexts[1], stepTexts[2], stepTexts[3], stepTexts[4]]);
+          setBoardBuildStage(4);
           setBoardDashboardVisible(true);
           setBoardTitle(responseData.title);
-          // Set initial filters from AI response
           const initFilters = (responseData.initFilters || [{ type: 'date', label: '日期筛选' }]).map(f => ({
             id: Date.now() + '_' + f.type, type: f.type, label: f.label, value: f.type === 'date' ? { start: '', end: '' } : ''
           }));
           setBoardFilters(initFilters);
-        }, 2200);
+        }, 2700);
         setTimeout(() => {
           clearInterval(streamTimer);
           setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', content: fullReply, type: 'board_dashboard' }]);
           setBoardStreamingMsgId(null);
           setBoardStreamingText('');
           setBoardSteps([]);
+          setBoardBuildStage(-1);
           setIsLoading(false);
-        }, 3200);
+        }, 3500);
       }
       return;
     }
@@ -2339,13 +2520,114 @@ ${messages.map(msg => {
         </div>
       )}
 
+      {/* Slash command dropdown */}
+      {showSlashMenu && generationType === 'board' && (() => {
+        const iconMap = { BarChart2, BarChart, Type: TextIcon, Trash2, Hash, Database, TrendingUp, List, Layers, Filter, Palette, Lightbulb, AlertTriangle, FileText: FileTextIcon, Wand2, Grid, Save, Send, Share2, Download, Pencil, Plus, Sparkles, Target, Link, Maximize2, Eye };
+        const query = slashFilter.toLowerCase();
+        const filtered = BOARD_SLASH_COMMANDS.filter(c =>
+          c.label.toLowerCase().includes(query) || c.desc.toLowerCase().includes(query) || c.category.toLowerCase().includes(query) || c.cmd.toLowerCase().includes('/' + query)
+        );
+        const categories = [...new Set(filtered.map(c => c.category))];
+        const categoryLabels = { '图表': '创建图表/报表', '数据': '调整数据', '辅助分析': '辅助分析', '查询筛选': '查询筛选', '智能洞察': '智能洞察', '样式美化': '样式美化', '报表操作': '报表操作' };
+        const categoryColors = { '图表': 'text-blue-500', '数据': 'text-emerald-500', '辅助分析': 'text-orange-500', '查询筛选': 'text-cyan-500', '智能洞察': 'text-purple-500', '样式美化': 'text-pink-500', '报表操作': 'text-gray-500' };
+        let flatIdx = 0;
+        return (
+          <div className="absolute bottom-full left-0 right-0 mb-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[360px] overflow-y-auto z-50 animate-in fade-in slide-in-from-bottom-2 custom-scrollbar">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-sm px-3 py-2 border-b border-gray-100">
+              <div className="text-[10px] uppercase tracking-wider text-gray-400 font-bold">指令中心 · 输入关键词筛选</div>
+            </div>
+            {filtered.length === 0 && (
+              <div className="px-4 py-6 text-center text-xs text-gray-400">未找到匹配的指令</div>
+            )}
+            {categories.map(cat => {
+              const items = filtered.filter(c => c.category === cat);
+              return (
+                <div key={cat}>
+                  <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${categoryColors[cat] || 'text-gray-400'} bg-gray-50/80`}>
+                    {categoryLabels[cat] || cat}
+                  </div>
+                  {items.map(c => {
+                    const thisIdx = flatIdx++;
+                    const Icon = iconMap[c.icon] || Hash;
+                    const isSelected = thisIdx === slashSelectedIdx;
+                    return (
+                      <button
+                        key={c.cmd}
+                        className={`w-full text-left px-3 py-2 flex items-center gap-3 transition-colors ${isSelected ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                        onMouseEnter={() => setSlashSelectedIdx(thisIdx)}
+                        onClick={() => {
+                          const handled = handleSlashCommand(c);
+                          if (!handled) {
+                            setInputText(c.cmd + ' ');
+                          }
+                          setShowSlashMenu(false);
+                          setSlashFilter('');
+                          inputRef.current?.focus();
+                        }}
+                      >
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                          <Icon size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium">{c.cmd}</div>
+                          <div className="text-[10px] text-gray-400 truncate">{c.desc}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       <textarea
         ref={inputRef}
         value={inputText}
-        onChange={(e) => setInputText(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+        onChange={(e) => {
+          const val = e.target.value;
+          setInputText(val);
+          if (generationType === 'board') {
+            if (val === '/') {
+              setShowSlashMenu(true);
+              setSlashFilter('');
+              setSlashSelectedIdx(0);
+            } else if (val.startsWith('/') && val.length > 1 && !val.includes(' ')) {
+              setShowSlashMenu(true);
+              setSlashFilter(val.slice(1));
+              setSlashSelectedIdx(0);
+            } else {
+              setShowSlashMenu(false);
+              setSlashFilter('');
+            }
+          }
+        }}
+        onKeyDown={(e) => {
+          if (showSlashMenu) {
+            const query = slashFilter.toLowerCase();
+            const filtered = BOARD_SLASH_COMMANDS.filter(c =>
+              c.label.toLowerCase().includes(query) || c.desc.toLowerCase().includes(query) || c.category.toLowerCase().includes(query) || c.cmd.toLowerCase().includes('/' + query)
+            );
+            if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSelectedIdx(prev => Math.min(prev + 1, filtered.length - 1)); return; }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSelectedIdx(prev => Math.max(prev - 1, 0)); return; }
+            if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              if (filtered[slashSelectedIdx]) {
+                const c = filtered[slashSelectedIdx];
+                const handled = handleSlashCommand(c);
+                if (!handled) setInputText(c.cmd + ' ');
+                setShowSlashMenu(false);
+                setSlashFilter('');
+              }
+              return;
+            }
+            if (e.key === 'Escape') { setShowSlashMenu(false); setSlashFilter(''); return; }
+          }
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
+        }}
         className="w-full h-6 resize-none border-none focus:ring-0 focus:outline-none outline-none text-gray-800 placeholder-gray-400 text-sm bg-transparent p-0 mb-1 leading-relaxed"
-        placeholder=""
+        placeholder={generationType === 'board' && boardDashboardVisible ? '输入 / 调出指令中心...' : ''}
       ></textarea>
 
       <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-50">
@@ -2895,6 +3177,90 @@ ${messages.map(msg => {
     setBoardContextMenu(null);
   };
 
+  // Board data panel handlers — add/remove/reorder dims and metrics
+  const boardActiveDimKeys = boardColumns.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
+  const boardActiveMetricKeys = boardColumns.filter(k => BOARD_ALL_COLUMNS[k] && !BOARD_ALL_COLUMNS[k].isDim);
+
+  const handleBoardAddDim = (key) => {
+    if (!boardColumns.includes(key)) setBoardColumns(prev => {
+      const dims = prev.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
+      const metrics = prev.filter(k => !BOARD_ALL_COLUMNS[k]?.isDim);
+      return [...dims, key, ...metrics];
+    });
+  };
+  const handleBoardRemoveDim = (key) => setBoardColumns(prev => prev.filter(k => k !== key));
+  const handleBoardAddMetric = (key) => {
+    if (!boardColumns.includes(key)) setBoardColumns(prev => [...prev, key]);
+  };
+  const handleBoardRemoveMetric = (key) => setBoardColumns(prev => prev.filter(k => k !== key));
+  const handleBoardReorderDims = (fromIdx, toIdx) => {
+    setBoardColumns(prev => {
+      const dims = prev.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
+      const metrics = prev.filter(k => !BOARD_ALL_COLUMNS[k]?.isDim);
+      const newDims = [...dims];
+      const [moved] = newDims.splice(fromIdx, 1);
+      newDims.splice(toIdx, 0, moved);
+      return [...newDims, ...metrics];
+    });
+  };
+  const handleBoardReorderMetrics = (fromIdx, toIdx) => {
+    setBoardColumns(prev => {
+      const dims = prev.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
+      const metrics = prev.filter(k => !BOARD_ALL_COLUMNS[k]?.isDim);
+      const newMetrics = [...metrics];
+      const [moved] = newMetrics.splice(fromIdx, 1);
+      newMetrics.splice(toIdx, 0, moved);
+      return [...dims, ...newMetrics];
+    });
+  };
+  const handleBoardAddFilterFromDrag = (key) => {
+    const col = BOARD_ALL_COLUMNS[key];
+    if (!col) return;
+    const typeMap = { date: 'date', area: 'area', district: 'district', grid: 'grid', hall: 'hall' };
+    const filterType = typeMap[key] || 'area';
+    setBoardFilters(prev => {
+      if (prev.some(f => f.type === filterType)) return prev;
+      return [...prev, { id: Date.now() + '_' + filterType, type: filterType, label: col.label, value: filterType === 'date' ? { start: '', end: '' } : '' }];
+    });
+  };
+
+  // Handle slash command selection — returns true if handled directly (no text needed)
+  const handleSlashCommand = (cmd) => {
+    switch (cmd.cmd) {
+      case '/智能美化':
+        setShowThemeSelector(prev => !prev);
+        setInputText('');
+        return true;
+      case '/智能洞察':
+        setBoardInsightsVisible(true);
+        setInputText('');
+        return true;
+      case '/保存':
+        setBoardSaveToast(true);
+        setTimeout(() => setBoardSaveToast(false), 2000);
+        setInputText('');
+        return true;
+      case '/发布':
+        setShowBoardPublishModal(true);
+        setInputText('');
+        return true;
+      case '/分享':
+        navigator.clipboard.writeText('https://chatbi.example.com/board/shared/' + Date.now());
+        setBoardSaveToast(true);
+        setTimeout(() => setBoardSaveToast(false), 2000);
+        setInputText('');
+        return true;
+      case '/导出':
+        setBoardSaveToast(true);
+        setTimeout(() => setBoardSaveToast(false), 2000);
+        setInputText('');
+        return true;
+      default:
+        // For other commands, put the cmd text in input for user to send as message
+        return false;
+    }
+  };
+
   // Compute dynamic metric groups for merged headers
   const boardDimCols = boardColumns.filter(k => BOARD_ALL_COLUMNS[k]?.isDim);
   const boardMetricCols = boardColumns.filter(k => !BOARD_ALL_COLUMNS[k]?.isDim);
@@ -2914,6 +3280,118 @@ ${messages.map(msg => {
       <style>{styles}</style>
       <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls" multiple onChange={handleFileUpload} />
       {showDatasetModal && <DatasetSelectionModal onClose={() => setShowDatasetModal(false)} onConfirm={handleDatasetConfirm} />}
+
+      {/* 创建智能看板弹窗 */}
+      {showBoardCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBoardCreateModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-[500px] overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Layout size={20} className="text-blue-500" /> 创建智能看板</h3>
+              <button onClick={() => setShowBoardCreateModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1.5 shadow-sm border border-gray-200"><X size={16} /></button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">看板名称 <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  value={boardFormName} 
+                  onChange={(e) => setBoardFormName(e.target.value)} 
+                  placeholder="请输入看板名称" 
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm placeholder:text-gray-400 shadow-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">业务需求描述 <span className="text-red-500">*</span></label>
+                <textarea 
+                  value={boardFormDesc} 
+                  onChange={(e) => setBoardFormDesc(e.target.value)} 
+                  rows={4}
+                  placeholder="请详细描述该看板需要展示的指标和维度..." 
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm resize-none custom-scrollbar placeholder:text-gray-400 shadow-sm"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setShowBoardCreateModal(false)} className="px-5 py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm">取消</button>
+              <button 
+                disabled={!boardFormName.trim() || !boardFormDesc.trim() || isLoading}
+                onClick={handleCreateBoard} 
+                className={`px-5 py-2.5 rounded-xl font-medium text-white flex items-center gap-2 transition-all shadow-md ${(!boardFormName.trim() || !boardFormDesc.trim() || isLoading) ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95'}`}
+              >
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>立即创建 <ChevronRight size={16} /></>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 发布看板弹窗 */}
+      {showBoardPublishModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBoardPublishModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-[460px] overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Send size={18} className="text-blue-500" /> 发布看板</h3>
+              <button onClick={() => setShowBoardPublishModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1.5 shadow-sm border border-gray-200"><X size={16} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">发布范围</label>
+                <div className="flex gap-2">
+                  {[{ v: 'self', l: '仅自己' }, { v: 'team', l: '团队可见' }, { v: 'public', l: '公开' }].map(o => (
+                    <button key={o.v} onClick={() => setBoardPublishScope(o.v)} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${boardPublishScope === o.v ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{o.l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">描述</label>
+                <textarea value={boardPublishDesc} onChange={e => setBoardPublishDesc(e.target.value)} rows={3} placeholder="为看板添加描述..." className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm resize-none" />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setShowBoardPublishModal(false)} className="px-5 py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button onClick={() => { setShowBoardPublishModal(false); setBoardSaveToast(true); setTimeout(() => setBoardSaveToast(false), 2000); }} className="px-5 py-2.5 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md">确认发布</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 定时任务弹窗 */}
+      {showBoardScheduleModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowBoardScheduleModal(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl w-[460px] overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Clock size={18} className="text-blue-500" /> 定时刷新任务</h3>
+              <button onClick={() => setShowBoardScheduleModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-1.5 shadow-sm border border-gray-200"><X size={16} /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">刷新频率</label>
+                <div className="flex gap-2">
+                  {[{ v: 'daily', l: '每天' }, { v: 'weekly', l: '每周' }, { v: 'monthly', l: '每月' }].map(o => (
+                    <button key={o.v} onClick={() => setBoardScheduleFreq(o.v)} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${boardScheduleFreq === o.v ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{o.l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">执行时间</label>
+                <input type="time" value={boardScheduleTime} onChange={e => setBoardScheduleTime(e.target.value)} className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">通知方式</label>
+                <div className="flex gap-2">
+                  {[{ v: 'email', l: '邮件通知' }, { v: 'dingtalk', l: '钉钉通知' }, { v: 'none', l: '不通知' }].map(o => (
+                    <button key={o.v} onClick={() => setBoardScheduleNotify(o.v)} className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${boardScheduleNotify === o.v ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{o.l}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+              <button onClick={() => setShowBoardScheduleModal(false)} className="px-5 py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition-colors">取消</button>
+              <button onClick={() => { setShowBoardScheduleModal(false); setBoardSaveToast(true); setTimeout(() => setBoardSaveToast(false), 2000); }} className="px-5 py-2.5 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md">保存任务</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 收藏确认弹窗 */}
       {showFavoriteConfirm && (
@@ -3159,7 +3637,7 @@ ${messages.map(msg => {
           </div>
         )}
 
-        <div className={`w-full mx-auto flex flex-col items-center relative z-10 ${isChatting ? 'flex-1 min-h-0' : 'min-h-full justify-center py-10'}`}>
+        <div className={`w-full mx-auto flex flex-col items-center relative z-10 ${isChatting ? 'flex-1 min-h-0' : 'min-h-full justify-center py-10 md:py-16'}`}>
 
           {!isChatting ? (
             <div className="flex flex-col items-center w-full animate-in fade-in duration-500">
@@ -3245,53 +3723,159 @@ ${messages.map(msg => {
                 </div>
               </div>
 
-              {/* 中央输入框 */}
-              <div className="w-full max-w-4xl mb-12">
-                {renderInputBox()}
-              </div>
-
-              {/* 提问示例 - 智能体模式下不显示（已在欢迎区展示） */}
-              {!agentInfo && (() => {
-                const sMap = suggestionsMap || initialSuggestionsMap;
-                const allItems = sMap[generationType] || sMap.qa;
-                const visibleItems = showAllSuggestions ? allItems : allItems.slice(0, 4);
-                return (
-                  <div className="w-full max-w-4xl">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-bold text-gray-800 text-sm">提问示例 (点击填充问题，发送后开始问答)</h3>
-                      {allItems.length > 4 && (
-                        <button
-                          onClick={() => setShowAllSuggestions(!showAllSuggestions)}
-                          className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
-                        >
-                          {showAllSuggestions ? '收起' : `查看更多 (${allItems.length})`}
-                          <ChevronDown size={14} className={`transition-transform ${showAllSuggestions ? 'rotate-180' : ''}`} />
-                        </button>
-                      )}
+              {generationType === 'board' ? (
+                <div className="w-full max-w-4xl mx-auto mb-12 animate-in fade-in slide-in-from-bottom-4">
+                  {/* 创建智能看板 — 宽卡片样式 */}
+                  <div
+                    onClick={() => { setBoardFormName(''); setBoardFormDesc(''); setShowBoardCreateModal(true); }}
+                    className="w-full border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:bg-blue-50/30 group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                      <Plus size={20} className="text-gray-400 group-hover:text-blue-500 transition-colors" />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {visibleItems.map((item, index) => (
-                        <div key={index} onClick={() => handleSuggestionClick(item)} className="bg-gray-50 p-5 rounded-2xl border border-gray-100 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-all shadow-sm flex flex-col justify-between group hover:-translate-y-1">
-                          <div className="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 transition-colors">{item.title}</div>
-                          <div className="text-xs text-gray-500 leading-relaxed mb-2">{item.query}</div>
-                          {item.template && (
-                            <div className="flex items-center gap-1 mt-auto">
-                              <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">模版: {item.template}</span>
-                            </div>
-                          )}
+                    <span className="text-sm font-medium text-gray-400 group-hover:text-blue-500 transition-colors">创建智能看板</span>
+                  </div>
+
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <LayoutTemplate size={20} className="text-blue-500" />
+                        示例看板
+                      </h3>
+                      <button
+                        onClick={() => { onNavigate('board-manage'); }}
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                      >
+                        更多看板 <ChevronRight size={16} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {boardTemplates.slice(0, 3).map((tpl, i) => (
+                        <div key={i} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md hover:border-blue-200 transition-all cursor-pointer group flex flex-col h-full" onClick={() => handleTemplateClick(tpl)}>
+                          <div className="h-28 border-b border-gray-100 overflow-hidden transition-colors" style={{ background: tpl.type === 'pie' ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)' : tpl.type === 'bar' ? 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)' : tpl.type === 'line' ? 'linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%)' : 'linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%)' }}>
+                            {tpl.type === 'pie' ? (
+                              <svg viewBox="0 0 200 100" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                                <rect x="8" y="8" width="44" height="22" rx="4" fill="#818CF8" opacity="0.15" />
+                                <rect x="12" y="12" width="20" height="4" rx="1" fill="#6366F1" opacity="0.6" />
+                                <rect x="12" y="19" width="30" height="6" rx="1" fill="#6366F1" opacity="0.9" />
+                                <rect x="58" y="8" width="44" height="22" rx="4" fill="#818CF8" opacity="0.15" />
+                                <rect x="62" y="12" width="18" height="4" rx="1" fill="#6366F1" opacity="0.6" />
+                                <rect x="62" y="19" width="28" height="6" rx="1" fill="#6366F1" opacity="0.9" />
+                                <circle cx="40" cy="65" r="22" fill="none" stroke="#C7D2FE" strokeWidth="8" />
+                                <circle cx="40" cy="65" r="22" fill="none" stroke="#6366F1" strokeWidth="8" strokeDasharray="55 83" strokeDashoffset="0" />
+                                <circle cx="40" cy="65" r="22" fill="none" stroke="#A78BFA" strokeWidth="8" strokeDasharray="28 110" strokeDashoffset="-55" />
+                                <rect x="80" y="72" width="10" height="18" rx="2" fill="#A78BFA" />
+                                <rect x="94" y="58" width="10" height="32" rx="2" fill="#6366F1" />
+                                <rect x="108" y="65" width="10" height="25" rx="2" fill="#818CF8" />
+                                <rect x="122" y="52" width="10" height="38" rx="2" fill="#6366F1" />
+                                <rect x="136" y="60" width="10" height="30" rx="2" fill="#A78BFA" />
+                                <rect x="156" y="42" width="36" height="5" rx="1" fill="#6366F1" opacity="0.2" />
+                                <rect x="156" y="50" width="36" height="5" rx="1" fill="#6366F1" opacity="0.15" />
+                                <rect x="156" y="58" width="36" height="5" rx="1" fill="#6366F1" opacity="0.1" />
+                                <rect x="156" y="66" width="36" height="5" rx="1" fill="#6366F1" opacity="0.15" />
+                                <rect x="156" y="74" width="36" height="5" rx="1" fill="#6366F1" opacity="0.1" />
+                              </svg>
+                            ) : tpl.type === 'bar' ? (
+                              <svg viewBox="0 0 200 100" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                                <rect x="8" y="8" width="56" height="22" rx="4" fill="#10B981" opacity="0.15" />
+                                <rect x="12" y="12" width="24" height="4" rx="1" fill="#059669" opacity="0.6" />
+                                <rect x="12" y="19" width="36" height="6" rx="1" fill="#059669" opacity="0.9" />
+                                <rect x="70" y="8" width="56" height="22" rx="4" fill="#10B981" opacity="0.15" />
+                                <rect x="74" y="12" width="20" height="4" rx="1" fill="#059669" opacity="0.6" />
+                                <rect x="74" y="19" width="32" height="6" rx="1" fill="#059669" opacity="0.9" />
+                                <rect x="132" y="8" width="56" height="22" rx="4" fill="#10B981" opacity="0.15" />
+                                <rect x="136" y="12" width="22" height="4" rx="1" fill="#059669" opacity="0.6" />
+                                <rect x="136" y="19" width="34" height="6" rx="1" fill="#059669" opacity="0.9" />
+                                <rect x="12" y="76" width="16" height="14" rx="2" fill="#34D399" />
+                                <rect x="32" y="62" width="16" height="28" rx="2" fill="#10B981" />
+                                <rect x="52" y="54" width="16" height="36" rx="2" fill="#059669" />
+                                <rect x="72" y="68" width="16" height="22" rx="2" fill="#34D399" />
+                                <rect x="92" y="48" width="16" height="42" rx="2" fill="#059669" />
+                                <rect x="112" y="58" width="16" height="32" rx="2" fill="#10B981" />
+                                <polyline points="140,78 152,65 164,70 176,55 188,60" fill="none" stroke="#059669" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <circle cx="140" cy="78" r="2.5" fill="#059669" />
+                                <circle cx="152" cy="65" r="2.5" fill="#059669" />
+                                <circle cx="164" cy="70" r="2.5" fill="#059669" />
+                                <circle cx="176" cy="55" r="2.5" fill="#059669" />
+                                <circle cx="188" cy="60" r="2.5" fill="#059669" />
+                              </svg>
+                            ) : tpl.type === 'line' ? (
+                              <svg viewBox="0 0 200 100" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                                <rect x="8" y="8" width="44" height="22" rx="4" fill="#F97316" opacity="0.15" />
+                                <rect x="12" y="12" width="20" height="4" rx="1" fill="#EA580C" opacity="0.6" />
+                                <rect x="12" y="19" width="30" height="6" rx="1" fill="#EA580C" opacity="0.9" />
+                                <polyline points="12,80 40,60 70,68 100,50 130,55 160,42 188,48" fill="none" stroke="#F97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <polyline points="12,85 40,75 70,78 100,65 130,70 160,58 188,62" fill="none" stroke="#FB923C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 200 100" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                                <rect x="8" y="8" width="44" height="22" rx="4" fill="#8B5CF6" opacity="0.15" />
+                                <rect x="12" y="12" width="20" height="4" rx="1" fill="#7C3AED" opacity="0.6" />
+                                <rect x="12" y="19" width="30" height="6" rx="1" fill="#7C3AED" opacity="0.9" />
+                                <rect x="58" y="40" width="60" height="50" rx="4" fill="#8B5CF6" opacity="0.12" />
+                                <rect x="130" y="40" width="60" height="50" rx="4" fill="#8B5CF6" opacity="0.12" />
+                              </svg>
+                            )}
+                          </div>
+                          <div className="p-5 flex-1 flex flex-col">
+                            <h4 className="font-bold text-gray-800 text-[15px] mb-2 group-hover:text-blue-600 transition-colors">{tpl.name}</h4>
+                            <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 font-medium">{tpl.desc}</p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                );
-              })()}
+                </div>
+              ) : (
+                <>
+                  {/* 中央输入框 */}
+                  <div className="w-full max-w-4xl mb-12">
+                    {renderInputBox()}
+                  </div>
+                  {/* 提问示例 - 智能体模式下不显示（已在欢迎区展示） */}
+                  {!agentInfo && (() => {
+                    const sMap = suggestionsMap || initialSuggestionsMap;
+                    const allItems = sMap[generationType] || sMap.qa;
+                    const visibleItems = showAllSuggestions ? allItems : allItems.slice(0, 4);
+                    return (
+                      <div className="w-full max-w-4xl">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-bold text-gray-800 text-sm">提问示例 (点击填充问题，发送后开始问答)</h3>
+                          {allItems.length > 4 && (
+                            <button
+                              onClick={() => setShowAllSuggestions(!showAllSuggestions)}
+                              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
+                            >
+                              {showAllSuggestions ? '收起' : `查看更多 (${allItems.length})`}
+                              <ChevronDown size={14} className={`transition-transform ${showAllSuggestions ? 'rotate-180' : ''}`} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {visibleItems.map((item, index) => (
+                            <div key={index} onClick={() => handleSuggestionClick(item)} className="bg-gray-50 p-5 rounded-2xl border border-gray-100 hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-all shadow-sm flex flex-col justify-between group hover:-translate-y-1">
+                              <div className="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 transition-colors">{item.title}</div>
+                              <div className="text-xs text-gray-500 leading-relaxed mb-2">{item.query}</div>
+                              {item.template && (
+                                <div className="flex items-center gap-1 mt-auto">
+                                  <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">模版: {item.template}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
             </div>
           ) : isHtmlWorkspace ? (
             <div className="w-full max-w-none mx-auto flex-1 min-h-0">
-              <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${showRightPanel ? 'grid-cols-1 lg:grid-cols-[44%_56%]' : 'grid-cols-1'}`}>
+              <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${showRightPanel ? 'grid-cols-1 lg:grid-cols-[30%_70%]' : 'grid-cols-1'}`}>
                 <div className="border-r border-gray-200 bg-white flex flex-col h-full overflow-hidden">
 
-                  <div ref={leftChatRef} className="px-6 pb-4 pt-4 flex-1 space-y-4 overflow-y-auto min-h-0">
+                  <div ref={leftChatRef} className="px-6 pb-4 pt-[40px] flex-1 space-y-4 overflow-y-auto min-h-0">
                     {messages.map((msg) => (
                       msg.role === 'user' ? (
                         <div key={msg.id} className="flex justify-end">
@@ -3784,219 +4368,239 @@ ${messages.map(msg => {
             </div>
           ) : isBoardWorkspace ? (
             <div className="w-full max-w-none mx-auto flex-1 min-h-0">
-              <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${boardDashboardVisible ? 'grid-cols-1 lg:grid-cols-[44%_56%]' : 'grid-cols-1'}`}>
-                {/* Left: Chat Panel */}
-                <div className="border-r border-gray-200 bg-white flex flex-col h-full min-h-0 overflow-hidden">
-                  <div ref={leftChatRef} className="px-6 pb-4 pt-4 flex-1 space-y-4 overflow-y-auto min-h-0">
-                    {messages.map(msg => msg.role === 'user' ? (
-                      <div key={msg.id} className="flex justify-end">
-                        <div className="max-w-[85%] bg-blue-50 text-gray-800 border border-blue-100 px-4 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed">{msg.content}</div>
-                      </div>
-                    ) : (
-                      <div key={msg.id} className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600"><Bot size={14} /></div>
-                        <div className="flex-1">
-                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed whitespace-pre-line">{msg.content || msg.text || ''}</div>
+              <div className={`flex flex-col border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden`}>
+
+                {/* Top: Toolbar spanning full width — always visible once board workspace enters */}
+                <BoardToolbar
+                  boardTitle={boardTitle || '新建看板'}
+                  boardDesc={boardDesc || '智能看板协同制作中'}
+                  saveStatus={boardSaveToast ? 'saved' : 'unsaved'}
+                  onSave={() => { setBoardSaveToast(true); setTimeout(() => setBoardSaveToast(false), 2000); }}
+                  onPublish={() => setShowBoardPublishModal(true)}
+                  onSchedule={() => setShowBoardScheduleModal(true)}
+                  onShare={() => { navigator.clipboard.writeText('https://chatbi.example.com/board/collab/' + Date.now()); setBoardSaveToast(true); setTimeout(() => setBoardSaveToast(false), 2000); }}
+                  onExport={(fmt) => { setBoardSaveToast(true); setTimeout(() => setBoardSaveToast(false), 2000); }}
+                  onUndo={() => {}}
+                  onRedo={() => {}}
+                />
+
+                {/* Bottom: Chat | Canvas | DataPanel */}
+                <div className="flex flex-1 min-h-0 overflow-hidden">
+
+                  {/* Left: AI Chat Panel — always 300px */}
+                  <div className="border-r border-gray-200 bg-white flex flex-col h-full min-h-0 overflow-hidden flex-shrink-0 w-[300px]">
+                    <div ref={leftChatRef} className="px-4 pb-3 pt-[40px] flex-1 space-y-3 overflow-y-auto min-h-0 custom-scrollbar">
+                      {messages.map(msg => msg.role === 'user' ? (
+                        <div key={msg.id} className="flex justify-end">
+                          <div className="max-w-[90%] bg-blue-50 text-gray-800 border border-blue-100 px-3 py-2 rounded-xl rounded-br-sm text-xs leading-relaxed">{msg.content}</div>
                         </div>
-                      </div>
-                    ))}
-                    {boardStreamingMsgId && (
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600"><Bot size={14} /></div>
-                        <div className="flex-1">
-                          <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
-                            {boardStreamingText}<span className="inline-block w-0.5 h-4 bg-blue-500 animate-pulse ml-0.5 align-text-bottom"></span>
+                      ) : (
+                        <div key={msg.id} className="flex items-start gap-2">
+                          <div className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600 flex-shrink-0"><Bot size={10} /></div>
+                          <div className="flex-1">
+                            <div className="bg-white border border-gray-200 rounded-xl rounded-tl-sm px-3 py-2 text-xs text-gray-700 leading-relaxed whitespace-pre-line">{msg.content || msg.text || ''}</div>
                           </div>
-                          {boardSteps.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              {boardSteps.map((step, i) => (
-                                <div key={i} className="flex items-center gap-2 text-xs animate-in fade-in slide-in-from-bottom-1">
-                                  {i < boardSteps.length - 1 || boardSteps.length === 3 ? (
-                                    <Check size={14} className="text-green-500" />
-                                  ) : (
-                                    <Loader2 size={14} className="text-blue-500 animate-spin" />
+                        </div>
+                      ))}
+                      {boardStreamingMsgId && (
+                        <div className="flex items-start gap-2">
+                          <div className="w-6 h-6 rounded-full bg-white border border-gray-200 flex items-center justify-center text-blue-600 flex-shrink-0"><Bot size={10} /></div>
+                          <div className="flex-1">
+                            <div className="bg-white border border-gray-200 rounded-xl rounded-tl-sm px-3 py-2 text-xs text-gray-700 leading-relaxed">
+                              {boardStreamingText}<span className="inline-block w-0.5 h-3 bg-blue-500 animate-pulse ml-0.5 align-text-bottom"></span>
+                            </div>
+                            {boardSteps.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {boardSteps.map((step, i) => (
+                                  <div key={i} className="flex items-center gap-1.5 text-[10px] animate-in fade-in slide-in-from-bottom-1">
+                                    {i < boardSteps.length - 1 || boardSteps.length === 5 ? (
+                                      <Check size={10} className="text-green-500" />
+                                    ) : (
+                                      <Loader2 size={10} className="text-blue-500 animate-spin" />
+                                    )}
+                                    <span className={i < boardSteps.length - 1 || boardSteps.length === 5 ? 'text-green-700' : 'text-blue-600'}>{step}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {boardBuildStage >= 0 && <BoardBuildProgress stage={boardBuildStage} />}
+                    </div>
+
+                    <div className="px-4 pb-4 mt-auto flex-shrink-0">
+                      {renderInputBox()}
+                    </div>
+                  </div>
+
+                  {/* Center: Canvas — always visible, shows loading skeleton or actual content */}
+                  <div className="bg-gray-50 flex flex-col flex-1 min-w-0 h-full overflow-hidden">
+                    <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                      {!boardDashboardVisible ? (
+                        /* Loading skeleton while AI is thinking */
+                        <div className="space-y-4 animate-pulse">
+                          {/* KPI skeleton row */}
+                          <div className="grid grid-cols-4 gap-3">
+                            {[0,1,2,3].map(i => (
+                              <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                                <div className="h-3 bg-gray-200 rounded w-20 mb-3"></div>
+                                <div className="h-6 bg-gray-200 rounded w-28 mb-2"></div>
+                                <div className="h-2 bg-gray-100 rounded w-16"></div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Charts skeleton row */}
+                          <div className="grid grid-cols-3 gap-3">
+                            {[0,1,2].map(i => (
+                              <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                                <div className="h-3 bg-gray-200 rounded w-24 mb-4"></div>
+                                <div className="flex items-end gap-1.5 h-[140px]">
+                                  {[40,65,50,80,55,70,45].map((h,j) => (
+                                    <div key={j} className="flex-1 bg-gray-100 rounded-t" style={{height: `${h}%`}}></div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Table skeleton */}
+                          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="flex gap-3 p-3 border-b border-gray-100">
+                              {[80,100,90,70,110,85].map((w,i) => (
+                                <div key={i} className="h-3 bg-gray-200 rounded" style={{width: w}}></div>
+                              ))}
+                            </div>
+                            {[0,1,2,3,4,5].map(i => (
+                              <div key={i} className="flex gap-3 p-3 border-b border-gray-50">
+                                {[80,100,90,70,110,85].map((w,j) => (
+                                  <div key={j} className="h-3 bg-gray-100 rounded" style={{width: w}}></div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                          {/* Loading indicator */}
+                          <div className="flex items-center justify-center py-8">
+                            <div className="flex items-center gap-3 text-sm text-gray-400">
+                              <Loader2 size={18} className="animate-spin text-blue-400" />
+                              <span>正在生成看板...</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Actual board content */
+                        <>
+                          {/* Theme Selector */}
+                          {showThemeSelector && (
+                            <BoardThemeSelector
+                              currentThemeKey={boardThemeKey}
+                              onSelectTheme={(key, theme) => { setBoardThemeKey(key); setBoardTheme(theme); }}
+                            />
+                          )}
+
+                          {/* Dynamic Filters — compact inline */}
+                          {boardFilters.length > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap mb-3">
+                              {boardFilters.map(filter => (
+                                <div key={filter.id} className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs animate-in fade-in slide-in-from-top-1">
+                                  <Filter size={11} className="text-gray-400" />
+                                  <span className="font-medium text-gray-600">{filter.label}</span>
+                                  {filter.type === 'date' && (
+                                    <>
+                                      <input type="date" value={filter.value?.start || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, start: e.target.value })} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400 w-[110px]" />
+                                      <span className="text-gray-300">~</span>
+                                      <input type="date" value={filter.value?.end || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, end: e.target.value })} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400 w-[110px]" />
+                                    </>
                                   )}
-                                  <span className={i < boardSteps.length - 1 || boardSteps.length === 3 ? 'text-green-700' : 'text-blue-600'}>{step}</span>
+                                  {filter.type === 'area' && (
+                                    <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400">
+                                      <option value="">全部</option>
+                                      {boardUniqueAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                                    </select>
+                                  )}
+                                  {filter.type === 'district' && (
+                                    <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400">
+                                      <option value="">全部</option>
+                                      {boardUniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                  )}
+                                  {filter.type === 'grid' && (
+                                    <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400">
+                                      <option value="">全部</option>
+                                      {boardUniqueGrids.map(g => <option key={g} value={g}>{g}</option>)}
+                                    </select>
+                                  )}
+                                  {filter.type === 'hall' && (
+                                    <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded px-1.5 py-0.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400">
+                                      <option value="">全部</option>
+                                      {boardUniqueHalls.map(h => <option key={h} value={h}>{h}</option>)}
+                                    </select>
+                                  )}
+                                  <button onClick={() => removeBoardFilter(filter.id)} className="text-gray-300 hover:text-red-500 transition-colors"><X size={12} /></button>
                                 </div>
                               ))}
+                              <span className="text-[10px] text-gray-400 ml-auto">{boardFilteredData.length} 条</span>
                             </div>
                           )}
-                        </div>
-                      </div>
-                    )}
+
+                          {/* Board Content */}
+                          {boardTitle.includes('流失') ? (
+                            <BeautifulDashboard />
+                          ) : (
+                            <div className="animate-in fade-in slide-in-from-bottom-2">
+                              <BoardKpiCards data={boardFilteredData} theme={boardTheme} />
+                              <BoardChartsRow data={boardFilteredData} theme={boardTheme} />
+                              <BoardDataTable
+                                data={boardFilteredData}
+                                boardColumns={boardColumns}
+                                boardDimCols={boardDimCols}
+                                boardMetricCols={boardMetricCols}
+                                boardMetricGroups={boardMetricGroups}
+                                BOARD_ALL_COLUMNS={BOARD_ALL_COLUMNS}
+                                boardContextMenu={boardContextMenu}
+                                setBoardContextMenu={setBoardContextMenu}
+                                handleBoardDrill={handleBoardDrill}
+                              />
+                              {boardInsightsVisible && <BoardInsightsSummary data={boardFilteredData} />}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="px-6 pb-6 mt-auto flex-shrink-0">
-                    {renderInputBox()}
+                  {/* Right: Data Panel — always visible */}
+                  <div className="border-l border-gray-200 flex-shrink-0">
+                    <BoardDataPanel
+                      allColumns={BOARD_ALL_COLUMNS}
+                      activeDimKeys={boardActiveDimKeys}
+                      activeMetricKeys={boardActiveMetricKeys}
+                      onAddDim={handleBoardAddDim}
+                      onRemoveDim={handleBoardRemoveDim}
+                      onAddMetric={handleBoardAddMetric}
+                      onRemoveMetric={handleBoardRemoveMetric}
+                      onReorderDims={handleBoardReorderDims}
+                      onReorderMetrics={handleBoardReorderMetrics}
+                      chartType={boardChartType}
+                      onChartTypeChange={setBoardChartType}
+                      boardFilters={boardFilters}
+                      onAddFilter={handleBoardAddFilterFromDrag}
+                      onSelectDataset={() => setShowDatasetModal(true)}
+                    />
                   </div>
+
                 </div>
 
-                {/* Right: Dashboard Preview */}
-                {boardDashboardVisible && (
-                  <div className="bg-gray-50 flex flex-col h-full overflow-hidden animate-in fade-in slide-in-from-right-2">
-                    <div className="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600"><BarChart2 size={16} /></div>
-                        <h3 className="text-sm font-bold text-gray-800">{boardTitle}</h3>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                      {/* Dynamic Filters */}
-                      {boardFilters.length > 0 && (
-                        <div className="space-y-3 mb-4">
-                          {boardFilters.map(filter => (
-                            <div key={filter.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 flex-wrap animate-in fade-in slide-in-from-top-1">
-                              <div className="flex items-center gap-2 text-sm text-gray-600">
-                                <Filter size={14} className="text-gray-400" />
-                                <span className="font-medium">{filter.label}</span>
-                              </div>
-                              {filter.type === 'date' && (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                    <label className="text-xs text-gray-500">开始日期</label>
-                                    <input type="date" value={filter.value?.start || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, start: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <label className="text-xs text-gray-500">结束日期</label>
-                                    <input type="date" value={filter.value?.end || ''} onChange={e => updateBoardFilter(filter.id, { ...filter.value, end: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-                                  </div>
-                                </>
-                              )}
-                              {filter.type === 'area' && (
-                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
-                                  <option value="">全部属地</option>
-                                  {boardUniqueAreas.map(a => <option key={a} value={a}>{a}</option>)}
-                                </select>
-                              )}
-                              {filter.type === 'district' && (
-                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
-                                  <option value="">全部区县</option>
-                                  {boardUniqueDistricts.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                              )}
-                              {filter.type === 'grid' && (
-                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
-                                  <option value="">全部网格</option>
-                                  {boardUniqueGrids.map(g => <option key={g} value={g}>{g}</option>)}
-                                </select>
-                              )}
-                              {filter.type === 'hall' && (
-                                <select value={filter.value || ''} onChange={e => updateBoardFilter(filter.id, e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 min-w-[120px]">
-                                  <option value="">全部营业厅</option>
-                                  {boardUniqueHalls.map(h => <option key={h} value={h}>{h}</option>)}
-                                </select>
-                              )}
-                              <button onClick={() => removeBoardFilter(filter.id)} className="ml-auto text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-red-50" title="移除此筛选">
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ))}
-                          <div className="flex items-center justify-end text-xs text-gray-400">共 {boardFilteredData.length} 条记录</div>
-                        </div>
-                      )}
-                      {boardFilters.length === 0 && (
-                        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-4 mb-4 flex items-center justify-center gap-2 text-sm text-gray-400">
-                          <Filter size={14} /> 暂无筛选条件，可通过左侧对话添加
-                        </div>
-                      )}
-
-                      {/* Data Table — dynamic columns */}
-                      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden relative" onClick={() => setBoardContextMenu(null)}>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              {/* Row 1: dimension headers (rowSpan 2) + metric group headers */}
-                              <tr className="bg-gray-50 border-b border-gray-200">
-                                {boardDimCols.map(k => {
-                                  const def = BOARD_ALL_COLUMNS[k];
-                                  return <th key={k} rowSpan={boardMetricGroups.length > 0 ? 2 : 1} className="px-3 py-2 text-left text-xs font-bold text-gray-600 border-r border-gray-100 whitespace-nowrap">{def.label}</th>;
-                                })}
-                                {boardMetricGroups.map((mg) => {
-                                  const colorMap = { blue: 'text-blue-600 bg-blue-50/50', emerald: 'text-emerald-600 bg-emerald-50/50', orange: 'text-orange-600 bg-orange-50/50', purple: 'text-purple-600 bg-purple-50/50', gray: 'text-gray-600 bg-gray-50/50' };
-                                  return <th key={mg.group} colSpan={mg.cols.length} className={`px-3 py-2 text-center text-xs font-bold border-r border-gray-100 ${colorMap[mg.color] || colorMap.gray}`}>{mg.group}</th>;
-                                })}
-                              </tr>
-                              {/* Row 2: individual metric sub-headers */}
-                              {boardMetricGroups.length > 0 && (
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                  {boardMetricCols.map((mk, mi) => (
-                                    <th key={mk} className={`px-3 py-1.5 text-center text-xs font-medium text-gray-500 border-r border-gray-100 whitespace-nowrap`}>{BOARD_ALL_COLUMNS[mk].label}</th>
-                                  ))}
-                                </tr>
-                              )}
-                            </thead>
-                            <tbody>
-                              {boardFilteredData.map((row, i) => (
-                                <tr key={i} className={`border-b border-gray-50 hover:bg-blue-50/30 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
-                                  {boardDimCols.map(k => {
-                                    const def = BOARD_ALL_COLUMNS[k];
-                                    const hasDrill = def.drillChildren && def.drillChildren.length > 0;
-                                    return (
-                                      <td
-                                        key={k}
-                                        className={`px-3 py-2 text-xs border-r border-gray-50 whitespace-nowrap ${k === 'area' || k === 'district' ? 'text-gray-700 font-medium' : 'text-gray-600'} ${hasDrill ? 'cursor-context-menu' : ''}`}
-                                        onContextMenu={hasDrill ? (e) => { e.preventDefault(); setBoardContextMenu({ x: e.clientX, y: e.clientY, colKey: k, cellValue: row[k] }); } : undefined}
-                                      >
-                                        {row[k]}
-                                        {hasDrill && <ChevronDown size={10} className="inline ml-1 text-gray-300" />}
-                                      </td>
-                                    );
-                                  })}
-                                  {boardMetricCols.map((mk, mi) => {
-                                    const def = BOARD_ALL_COLUMNS[mk];
-                                    const val = row[mk];
-                                    const display = def.format === 'money' ? val.toLocaleString() : def.format === 'percent' ? val + '%' : val;
-                                    return <td key={mk} className="px-3 py-2 text-xs text-gray-700 text-center border-r border-gray-50">{display}</td>;
-                                  })}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Right-click context menu for drill-down */}
-                        {boardContextMenu && (() => {
-                          const def = BOARD_ALL_COLUMNS[boardContextMenu.colKey];
-                          const children = (def.drillChildren || []).filter(ck => !boardColumns.includes(ck));
-                          if (children.length === 0) return null;
-                          return (
-                            <div
-                              className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95"
-                              style={{ left: boardContextMenu.x, top: boardContextMenu.y }}
-                              onClick={e => e.stopPropagation()}
-                            >
-                              <div className="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wider">下钻维度</div>
-                              {children.map(ck => (
-                                <button
-                                  key={ck}
-                                  onClick={() => handleBoardDrill(boardContextMenu.colKey, ck)}
-                                  className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors flex items-center gap-2"
-                                >
-                                  <ChevronRight size={12} className="text-gray-400" />
-                                  下钻到「{BOARD_ALL_COLUMNS[ck].label}」
-                                </button>
-                              ))}
-                              <div className="border-t border-gray-100 mt-1 pt-1">
-                                <button
-                                  onClick={() => setBoardContextMenu(null)}
-                                  className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 transition-colors"
-                                >
-                                  取消
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </div>
+                {/* Save Toast */}
+                {boardSaveToast && (
+                  <div className="fixed bottom-8 right-8 z-50 bg-green-500 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                    <Check size={16} /> 操作成功
                   </div>
                 )}
               </div>
             </div>
           ) : (
             // --- 对话流区域 ---
-            <div className="w-full max-w-5xl mx-auto pb-32">
+            <div className="w-full max-w-5xl mx-auto pb-32 pt-8">
               {messages.map((msg, idx) => renderMessage(msg, idx))}
 
               {isLoading && (
@@ -4058,6 +4662,30 @@ export default function App() {
     { id: 't2', name: '通信费用月度报告模版', creator: 'admin', createdAt: '2026-02-08 09:15', file: { name: '通信费用月度报告.html', size: 18432 } },
     { id: 't3', name: '经营数据看板模版', creator: 'yuchen', createdAt: '2026-01-20 16:45', file: { name: '经营数据看板.html', size: 31744 } },
   ]);
+  // Board manage state & data
+  const [boardManageSearch, setBoardManageSearch] = useState('');
+  const [boardManageTag, setBoardManageTag] = useState('全部');
+  const SAVED_BOARDS_APP = [
+    { id: 1, name: '流失用户洞察看板', tags: ['用户分析', '流失'], updatedAt: '2026-03-20 14:30:00', creator: '张三', status: 'published', type: 'pie' },
+    { id: 2, name: '月度经营分析看板', tags: ['经营分析'], updatedAt: '2026-03-19 10:15:00', creator: '管理员', status: 'published', type: 'bar' },
+    { id: 3, name: '各属地新增业务排名', tags: ['业务排名', '属地'], updatedAt: '2026-03-18 16:22:00', creator: '李四', status: 'published', type: 'bar' },
+    { id: 4, name: '宽带收入异常下降检测', tags: ['宽带', '异常检测'], updatedAt: '2026-03-17 09:45:00', creator: '王五', status: 'draft', type: 'line' },
+    { id: 5, name: '营业厅业绩排名与达标率', tags: ['营业厅', '业绩'], updatedAt: '2026-03-16 11:30:00', creator: '管理员', status: 'published', type: 'bar' },
+    { id: 6, name: '区县维度收入占比及同比', tags: ['区县', '收入'], updatedAt: '2026-03-15 15:00:00', creator: '张三', status: 'published', type: 'pie' },
+    { id: 7, name: '高价值用户画像分析', tags: ['用户分析', '画像'], updatedAt: '2026-03-14 13:20:00', creator: '李四', status: 'draft', type: 'pie' },
+    { id: 8, name: '渠道转化漏斗分析', tags: ['渠道', '转化'], updatedAt: '2026-03-13 08:50:00', creator: '王五', status: 'published', type: 'bar' },
+    { id: 9, name: '5G套餐迁移趋势监控', tags: ['5G', '套餐'], updatedAt: '2026-03-12 17:10:00', creator: '管理员', status: 'published', type: 'line' },
+    { id: 10, name: '客户满意度NPS追踪', tags: ['满意度', 'NPS'], updatedAt: '2026-03-11 14:00:00', creator: '张三', status: 'draft', type: 'line' },
+    { id: 11, name: '投诉工单热力分析', tags: ['投诉', '工单'], updatedAt: '2026-03-10 10:30:00', creator: '李四', status: 'published', type: 'bar' },
+    { id: 12, name: '资费套餐收入结构', tags: ['资费', '收入'], updatedAt: '2026-03-09 09:15:00', creator: '王五', status: 'published', type: 'pie' },
+  ];
+  const boardManageTags = ['全部', ...new Set(SAVED_BOARDS_APP.flatMap(b => b.tags))];
+  const boardManageFiltered = SAVED_BOARDS_APP.filter(b => {
+    const matchSearch = !boardManageSearch || b.name.includes(boardManageSearch) || b.tags.some(t => t.includes(boardManageSearch));
+    const matchTag = boardManageTag === '全部' || b.tags.includes(boardManageTag);
+    return matchSearch && matchTag;
+  });
+
   const [pendingDeleteTemplateId, setPendingDeleteTemplateId] = useState(null);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [templateEditName, setTemplateEditName] = useState('');
@@ -4226,6 +4854,9 @@ export default function App() {
     } else if (currentView === 'html-template-manage') {
       crumbs.push({ label: '报告管理' });
       crumbs.push({ label: 'HTML模版管理' });
+    } else if (currentView === 'board-manage') {
+      crumbs.push({ label: '报告管理' });
+      crumbs.push({ label: '看板管理' });
     } else if (currentView === 'suggestion-manage') {
       crumbs.push({ label: '运营管理' });
       crumbs.push({ label: '提问示例管理' });
@@ -4340,10 +4971,10 @@ export default function App() {
             <button onClick={() => setShowQrCodeModal(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><QrCode size={16} /><span className="hidden sm:inline">小程序体验</span></button>
           </div>
         </div>
-        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} />}
+        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} setIsNavCollapsed={setIsNavCollapsed} setIsChatCollapsed={setIsChatCollapsed} />}
         {currentView === 'agent-manage' && <AgentManageView onNavigate={setCurrentView} />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
-        {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} />}
+        {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} setIsNavCollapsed={setIsNavCollapsed} setIsChatCollapsed={setIsChatCollapsed} />}
         {currentView === 'report-favorite' && (
           <div className="flex-1 overflow-y-auto p-8">
             <div className="max-w-4xl mx-auto">
@@ -4517,6 +5148,131 @@ export default function App() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {currentView === 'board-manage' && (
+          <div className="flex-1 overflow-y-auto p-8">
+            <div className="max-w-6xl mx-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-500"><LayoutDashboard size={20} /></div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">看板管理</h2>
+                    <p className="text-sm text-gray-400">管理所有已创建的智能看板</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setCurrentView('home'); setActiveGenType('board'); setHomeViewKey(k => k + 1); }}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-xl shadow-sm transition-colors"
+                >
+                  <Plus size={16} /> 新建看板
+                </button>
+              </div>
+
+              {/* Search + Tags */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="relative flex-1 max-w-sm">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+                    <input
+                      type="text" value={boardManageSearch} onChange={e => setBoardManageSearch(e.target.value)}
+                      placeholder="搜索看板名称或标签"
+                      className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 bg-gray-50"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-400 mr-1">标签：</span>
+                  {boardManageTags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => setBoardManageTag(tag)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${boardManageTag === tag ? 'bg-blue-500 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600'}`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Board Cards Grid */}
+              {boardManageFiltered.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 text-gray-400">
+                  <LayoutDashboard size={48} className="mb-4 text-gray-200" />
+                  <div className="text-base font-medium mb-1">暂无看板</div>
+                  <div className="text-sm">点击右上角「新建看板」创建您的第一个智能看板</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {boardManageFiltered.map(board => {
+                    const gradients = { pie: 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)', bar: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)', line: 'linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%)' };
+                    const colors = { pie: { main: '#6366F1', light: '#818CF8' }, bar: { main: '#059669', light: '#34D399' }, line: { main: '#EA580C', light: '#F97316' } };
+                    const c = colors[board.type] || colors.bar;
+                    return (
+                      <div key={board.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer group flex flex-col" onClick={() => { setCurrentView('home'); setActiveGenType('board'); setHomeViewKey(k => k + 1); }}>
+                        {/* Preview thumbnail */}
+                        <div className="h-24 overflow-hidden relative" style={{ background: gradients[board.type] || gradients.bar }}>
+                          {board.type === 'bar' && (
+                            <svg viewBox="0 0 200 80" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                              <rect x="20" y="50" width="18" height="22" rx="3" fill={c.light} />
+                              <rect x="44" y="35" width="18" height="37" rx="3" fill={c.main} />
+                              <rect x="68" y="25" width="18" height="47" rx="3" fill={c.light} />
+                              <rect x="92" y="40" width="18" height="32" rx="3" fill={c.main} />
+                              <rect x="116" y="20" width="18" height="52" rx="3" fill={c.light} />
+                              <rect x="140" y="30" width="18" height="42" rx="3" fill={c.main} />
+                              <rect x="164" y="38" width="18" height="34" rx="3" fill={c.light} />
+                            </svg>
+                          )}
+                          {board.type === 'pie' && (
+                            <svg viewBox="0 0 200 80" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                              <circle cx="100" cy="40" r="28" fill="none" stroke="#C7D2FE" strokeWidth="10" />
+                              <circle cx="100" cy="40" r="28" fill="none" stroke={c.main} strokeWidth="10" strokeDasharray="70 106" />
+                              <circle cx="100" cy="40" r="28" fill="none" stroke={c.light} strokeWidth="10" strokeDasharray="35 141" strokeDashoffset="-70" />
+                            </svg>
+                          )}
+                          {board.type === 'line' && (
+                            <svg viewBox="0 0 200 80" className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+                              <polyline points="15,55 45,35 75,42 105,25 135,30 165,18 190,28" fill="none" stroke={c.main} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                              <polyline points="15,60 45,50 75,52 105,40 135,45 165,35 190,40" fill="none" stroke={c.light} strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+                            </svg>
+                          )}
+                          {/* Status badge */}
+                          <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-medium ${board.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {board.status === 'published' ? '已发布' : '草稿'}
+                          </div>
+                        </div>
+                        {/* Info */}
+                        <div className="p-4 flex-1 flex flex-col">
+                          <h4 className="font-bold text-gray-800 text-sm mb-2 group-hover:text-blue-600 transition-colors truncate">{board.name}</h4>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            {board.tags.map(tag => (
+                              <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded border border-blue-100">{tag}</span>
+                            ))}
+                          </div>
+                          <div className="mt-auto flex items-center justify-between text-[10px] text-gray-400">
+                            <span>{board.creator}</span>
+                            <span>{board.updatedAt.split(' ')[0]}</span>
+                          </div>
+                        </div>
+                        {/* Hover actions */}
+                        <div className="border-t border-gray-100 px-4 py-2 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={e => { e.stopPropagation(); }} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="预览"><Eye size={13} /></button>
+                          <button onClick={e => { e.stopPropagation(); }} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="编辑"><Pencil size={13} /></button>
+                          <button onClick={e => { e.stopPropagation(); }} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="分享"><Share2 size={13} /></button>
+                          <button onClick={e => { e.stopPropagation(); }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="删除"><Trash2 size={13} /></button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="mt-6 flex items-center justify-between text-xs text-gray-400">
+                <span>共 {boardManageFiltered.length} 个看板</span>
+              </div>
             </div>
           </div>
         )}
