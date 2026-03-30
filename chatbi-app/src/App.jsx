@@ -672,7 +672,7 @@ const datasetFields = {
 };
 
 // --- API 模拟：实现多轮问答路由引擎 ---
-const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
+const simulateAIResponse = (query, mode = 'qa', templateTitle = '', userSelectedFiles = []) => {
   return new Promise((resolve) => {
     setTimeout(() => {
       if (mode === 'board') {
@@ -791,19 +791,45 @@ const simulateAIResponse = (query, mode = 'qa', templateTitle = '') => {
           { keywords: ['省份', '地区', '区域'], ids: ['ds-4', 'ds-2', 'ds-1'] },
         ];
         const matchedIds = new Set();
+        // 用户已选文件 -> 尝试匹配已有数据集，匹配不上的作为额外数据集直接加入
+        const userExtraDatasets = []; // 匹配不上 allDatasets 的用户文件，直接作为数据集加入
+        if (userSelectedFiles.length > 0) {
+          for (const file of userSelectedFiles) {
+            const fname = file.name.replace(/\.(csv|xlsx|xls)$/i, '').toLowerCase();
+            const found = allDatasets.find(ds => ds.name.toLowerCase().includes(fname) || fname.includes(ds.name.toLowerCase()));
+            if (found) {
+              matchedIds.add(found.id);
+            } else {
+              // 匹配不上的文件，直接构造一个数据集条目加入召回结果
+              const cleanName = file.name.replace(/\.(csv|xlsx|xls)$/i, '');
+              userExtraDatasets.push({
+                id: 'ds-user-' + cleanName,
+                name: cleanName,
+                size: file.size || 'Unknown',
+                desc: '用户选择的数据集',
+              });
+            }
+          }
+        }
         for (const rule of keywordMap) {
           if (rule.keywords.some(kw => q.includes(kw))) {
             rule.ids.forEach(id => matchedIds.add(id));
           }
         }
-        // 如果没有匹配到任何关键词，默认召回前 3 个通用数据集
-        if (matchedIds.size === 0) {
+        // 如果没有匹配到任何关键词且用户也没选数据集，默认召回前 3 个通用数据集
+        if (matchedIds.size === 0 && userExtraDatasets.length === 0) {
           ['ds-1', 'ds-2', 'ds-4'].forEach(id => matchedIds.add(id));
         }
-        const recalledDatasets = allDatasets.filter(ds => matchedIds.has(ds.id));
+        // 合并：用户选择的数据集排在最前面，然后是语义召回的
+        const semanticDatasets = allDatasets.filter(ds => matchedIds.has(ds.id));
+        const recalledDatasets = [...userExtraDatasets, ...semanticDatasets];
+        const userSelectedCount = userSelectedFiles.length;
+        const recallText = userSelectedCount > 0
+          ? `已根据您的需求「${query}」语义分析，并结合您选择的 ${userSelectedCount} 个数据集，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`
+          : `已根据您的需求「${query}」语义分析，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`;
         resolve({
           type: 'dataset_recall',
-          text: `已根据您的需求「${query}」语义分析，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`,
+          text: recallText,
           datasets: recalledDatasets,
           originalQuery: query,
         });
@@ -981,38 +1007,137 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, currentView, setCurrentView, onG
 
 const DatasetSelectionModal = ({ onClose, onConfirm }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDatasets, setSelectedDatasets] = useState(['1', '2', '3', '4', '5', '6']);
+  const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [rightTab, setRightTab] = useState('fields');
   const [fieldSearch, setFieldSearch] = useState('');
+  const [activePreview, setActivePreview] = useState(null); // 当前预览的数据集 id
 
   const datasets = [
-    { id: '1', name: 'ChatBI小程序应用问题清单...' },
-    { id: '2', name: 'ChatBI小程序应用问题清单...' },
-    { id: '3', name: 'config_chat_msg_202602...' },
-    { id: '4', name: '高速公路成本费用表-Sheet...' },
-    { id: '5', name: '高速公路成本费用表-Sheet...' },
-    { id: '6', name: '高速公路成本费用表-Sheet...' },
-    { id: '7', name: '高速公路成本费用表-Sheet...' },
-    { id: '8', name: '高速公路成本费用表-Sheet...' },
-    { id: '9', name: '测试0123-进行中商机趋势...' },
+    { id: '1', name: '用户流失明细表' },
+    { id: '2', name: '流失用户画像宽表' },
+    { id: '3', name: '用户挽留行为记录' },
+    { id: '4', name: '流失预警评分表' },
+    { id: '5', name: '用户通信费用日表' },
+    { id: '6', name: '用户套餐订购表' },
+    { id: '7', name: '客户投诉工单表' },
+    { id: '8', name: '各省份月度营收表' },
+    { id: '9', name: '营业厅业务办理表' },
   ];
 
-  // 完美复刻右侧图3的 4 个字段列
-  const fieldsData = [
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'session_id', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'msg_id', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'msg_content', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: '是否默认', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'prompt_content', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'chart_data', type: '维度', format: '' },
-    { physName: 'A_A8B60B2F21CC99E3C...', name: 'msg_time', type: '维度', format: 'yyyy-MM' },
-    { physName: 'A_A8B60B2F21CC99E3C91', name: 'msg_type', type: '度量', format: '' },
-  ];
+  // 每个数据集对应的字段定义
+  const fieldsMap = {
+    '1': [
+      { physName: 'user_churn_detail.user_id', name: 'user_id', type: '维度', format: '' },
+      { physName: 'user_churn_detail.phone_no', name: 'phone_no', type: '维度', format: '' },
+      { physName: 'user_churn_detail.province', name: 'province', type: '维度', format: '' },
+      { physName: 'user_churn_detail.city', name: 'city', type: '维度', format: '' },
+      { physName: 'user_churn_detail.churn_date', name: 'churn_date', type: '维度', format: 'yyyy-MM-dd' },
+      { physName: 'user_churn_detail.churn_type', name: 'churn_type', type: '维度', format: '' },
+      { physName: 'user_churn_detail.churn_reason', name: 'churn_reason', type: '维度', format: '' },
+      { physName: 'user_churn_detail.tenure_months', name: 'tenure_months', type: '度量', format: '' },
+      { physName: 'user_churn_detail.last_month_arpu', name: 'last_month_arpu', type: '度量', format: '0.00' },
+      { physName: 'user_churn_detail.total_revenue', name: 'total_revenue', type: '度量', format: '0.00' },
+    ],
+    '2': [
+      { physName: 'churn_user_profile.user_id', name: 'user_id', type: '维度', format: '' },
+      { physName: 'churn_user_profile.age_group', name: 'age_group', type: '维度', format: '' },
+      { physName: 'churn_user_profile.gender', name: 'gender', type: '维度', format: '' },
+      { physName: 'churn_user_profile.package_name', name: 'package_name', type: '维度', format: '' },
+      { physName: 'churn_user_profile.monthly_call_min', name: 'monthly_call_min', type: '度量', format: '' },
+      { physName: 'churn_user_profile.monthly_data_gb', name: 'monthly_data_gb', type: '度量', format: '0.0' },
+      { physName: 'churn_user_profile.complaint_count', name: 'complaint_count', type: '度量', format: '' },
+      { physName: 'churn_user_profile.contract_remain', name: 'contract_remain_months', type: '度量', format: '' },
+      { physName: 'churn_user_profile.is_5g_user', name: 'is_5g_user', type: '维度', format: '' },
+      { physName: 'churn_user_profile.churn_risk_level', name: 'churn_risk_level', type: '维度', format: '' },
+    ],
+    '3': [
+      { physName: 'retention_action.action_id', name: 'action_id', type: '维度', format: '' },
+      { physName: 'retention_action.user_id', name: 'user_id', type: '维度', format: '' },
+      { physName: 'retention_action.action_type', name: 'action_type', type: '维度', format: '' },
+      { physName: 'retention_action.action_date', name: 'action_date', type: '维度', format: 'yyyy-MM-dd' },
+      { physName: 'retention_action.channel', name: 'channel', type: '维度', format: '' },
+      { physName: 'retention_action.offer_name', name: 'offer_name', type: '维度', format: '' },
+      { physName: 'retention_action.offer_amount', name: 'offer_amount', type: '度量', format: '0.00' },
+      { physName: 'retention_action.is_retained', name: 'is_retained', type: '维度', format: '' },
+      { physName: 'retention_action.retained_months', name: 'retained_months', type: '度量', format: '' },
+    ],
+    '4': [
+      { physName: 'churn_risk_score.user_id', name: 'user_id', type: '维度', format: '' },
+      { physName: 'churn_risk_score.score_date', name: 'score_date', type: '维度', format: 'yyyy-MM-dd' },
+      { physName: 'churn_risk_score.risk_score', name: 'risk_score', type: '度量', format: '0.00' },
+      { physName: 'churn_risk_score.risk_level', name: 'risk_level', type: '维度', format: '' },
+      { physName: 'churn_risk_score.top_factor_1', name: 'top_factor_1', type: '维度', format: '' },
+      { physName: 'churn_risk_score.top_factor_2', name: 'top_factor_2', type: '维度', format: '' },
+      { physName: 'churn_risk_score.predicted_churn_prob', name: 'predicted_churn_prob', type: '度量', format: '0.0%' },
+      { physName: 'churn_risk_score.model_version', name: 'model_version', type: '维度', format: '' },
+    ],
+  };
+
+  // 每个数据集对应的样例数据
+  const sampleDataMap = {
+    '1': {
+      columns: ['user_id', 'phone_no', 'province', 'churn_date', 'churn_type', 'churn_reason', 'tenure_months', 'last_month_arpu'],
+      rows: [
+        ['U100234', '138****5521', '江苏', '2026-01-15', '主动销户', '资费过高', 36, 58.50],
+        ['U100891', '159****3302', '浙江', '2026-01-18', '欠费停机', '信号差', 12, 32.00],
+        ['U101456', '186****7789', '上海', '2026-02-03', '携号转网', '竞品优惠', 24, 89.00],
+        ['U102003', '135****1124', '江苏', '2026-02-10', '主动销户', '出国不用', 48, 128.00],
+        ['U102567', '177****4456', '安徽', '2026-02-14', '欠费停机', '使用减少', 8, 19.90],
+      ]
+    },
+    '2': {
+      columns: ['user_id', 'age_group', 'gender', 'package_name', 'monthly_call_min', 'monthly_data_gb', 'complaint_count', 'churn_risk_level'],
+      rows: [
+        ['U100234', '31-40岁', '男', '畅享59元套餐', 320, 8.5, 2, '高'],
+        ['U100891', '18-25岁', '女', '流量王29元套餐', 45, 15.2, 0, '中'],
+        ['U101456', '41-50岁', '男', '全家享128元套餐', 580, 5.1, 3, '高'],
+        ['U102003', '26-30岁', '女', '5G畅享199元套餐', 120, 30.7, 1, '低'],
+        ['U102567', '51-60岁', '男', '经济19元套餐', 210, 1.2, 0, '中'],
+      ]
+    },
+    '3': {
+      columns: ['action_id', 'user_id', 'action_type', 'action_date', 'channel', 'offer_name', 'offer_amount', 'is_retained'],
+      rows: [
+        ['A20001', 'U100234', '电话挽留', '2026-01-10', '10010外呼', '赠送3个月话费', 90.00, '否'],
+        ['A20002', 'U100891', '短信触达', '2026-01-12', '短信平台', '升级套餐享5折', 0, '否'],
+        ['A20003', 'U101456', '营业厅面访', '2026-01-28', '线下营业厅', '赠送宽带1年', 600.00, '是'],
+        ['A20004', 'U102003', 'APP弹窗', '2026-02-05', 'APP推送', '国际漫游5折', 0, '否'],
+        ['A20005', 'U103888', '电话挽留', '2026-02-08', '10010外呼', '赠送1000分钟通话', 50.00, '是'],
+      ]
+    },
+    '4': {
+      columns: ['user_id', 'score_date', 'risk_score', 'risk_level', 'top_factor_1', 'top_factor_2', 'predicted_churn_prob'],
+      rows: [
+        ['U100234', '2026-01-01', 87.5, '高危', 'ARPU连续下降', '投诉未解决', '82.3%'],
+        ['U100891', '2026-01-01', 62.0, '中危', '使用量骤降', '合约即将到期', '55.8%'],
+        ['U101456', '2026-01-01', 91.2, '高危', '竞品接触频繁', 'ARPU远高于套餐', '89.1%'],
+        ['U102003', '2026-01-01', 33.5, '低危', '出账地变更', '——', '28.7%'],
+        ['U103888', '2026-01-01', 78.0, '高危', '投诉3次未解决', '信号覆盖差', '71.5%'],
+      ]
+    },
+  };
+
+  // 默认字段（当没有选中数据集或选中的数据集没有定义字段时）
+  const defaultFields = fieldsMap['1'];
+
+  // 当前预览的数据集：优先用 activePreview，否则用第一个选中的
+  const previewId = activePreview || selectedDatasets[0] || '1';
+  const currentFields = fieldsMap[previewId] || defaultFields;
+  const currentSampleData = sampleDataMap[previewId] || null;
+
+  const filteredFields = fieldSearch
+    ? currentFields.filter(f => f.name.toLowerCase().includes(fieldSearch.toLowerCase()) || f.physName.toLowerCase().includes(fieldSearch.toLowerCase()))
+    : currentFields;
+
+  const filteredDatasets = searchQuery
+    ? datasets.filter(ds => ds.name.includes(searchQuery))
+    : datasets;
 
   const toggleDataset = (id) => {
     setSelectedDatasets(prev =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
+    setActivePreview(id);
   };
 
   const handleConfirm = () => {
@@ -1052,8 +1177,8 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
               <span className="text-sm font-medium text-gray-700 ml-2">数据集名称</span>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {datasets.map(ds => (
-                <div key={ds.id} className={`flex items-center px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${selectedDatasets.includes(ds.id) ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`} onClick={() => toggleDataset(ds.id)}>
+              {filteredDatasets.map(ds => (
+                <div key={ds.id} className={`flex items-center px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${activePreview === ds.id ? 'bg-blue-50' : selectedDatasets.includes(ds.id) ? 'bg-blue-50/50' : 'hover:bg-gray-50'}`} onClick={() => toggleDataset(ds.id)}>
                   <div className="w-8 flex justify-center">
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedDatasets.includes(ds.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 bg-white'}`}>
                       {selectedDatasets.includes(ds.id) && <div className="text-white text-[10px] font-bold">✓</div>}
@@ -1081,26 +1206,54 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
               </div>
             </div>
             <div className="flex-1 overflow-auto p-6 pt-2">
-              <table className="w-full text-sm text-left">
-                <thead className="text-gray-500 font-medium border-b border-gray-200">
-                  <tr>
-                    <th className="py-3 font-normal">物理字段名</th>
-                    <th className="py-3 font-normal">字段名</th>
-                    <th className="py-3 font-normal">字段属性</th>
-                    <th className="py-3 font-normal text-right">日期格式</th>
-                  </tr>
-                </thead>
-                <tbody className="text-gray-600">
-                  {fieldsData.map((field, idx) => (
-                    <tr key={idx} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3 truncate max-w-[150px]" title={field.physName}>{field.physName}</td>
-                      <td className="py-3 font-medium text-gray-700">{field.name}</td>
-                      <td className="py-3">{field.type}</td>
-                      <td className="py-3 text-right">{field.format}</td>
+              {rightTab === 'fields' ? (
+                <table className="w-full text-sm text-left">
+                  <thead className="text-gray-500 font-medium border-b border-gray-200">
+                    <tr>
+                      <th className="py-3 font-normal">物理字段名</th>
+                      <th className="py-3 font-normal">字段名</th>
+                      <th className="py-3 font-normal">字段属性</th>
+                      <th className="py-3 font-normal text-right">日期格式</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="text-gray-600">
+                    {filteredFields.map((field, idx) => (
+                      <tr key={idx} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
+                        <td className="py-3 truncate max-w-[150px]" title={field.physName}>{field.physName}</td>
+                        <td className="py-3 font-medium text-gray-700">{field.name}</td>
+                        <td className="py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${field.type === '度量' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>{field.type}</span></td>
+                        <td className="py-3 text-right text-gray-400">{field.format || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                currentSampleData ? (
+                  <div className="overflow-x-auto">
+                    <div className="text-xs text-gray-400 mb-3">样例数据（前 {currentSampleData.rows.length} 行）· {datasets.find(d => d.id === previewId)?.name}</div>
+                    <table className="w-full text-sm text-left border border-gray-100 rounded-lg overflow-hidden">
+                      <thead className="bg-gray-50 text-gray-500 font-medium">
+                        <tr>
+                          {currentSampleData.columns.map((col, i) => (
+                            <th key={i} className="py-2.5 px-3 font-medium text-xs whitespace-nowrap border-b border-gray-100">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-600">
+                        {currentSampleData.rows.map((row, rIdx) => (
+                          <tr key={rIdx} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
+                            {row.map((cell, cIdx) => (
+                              <td key={cIdx} className="py-2.5 px-3 text-xs whitespace-nowrap">{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-sm text-gray-400">点击左侧数据集查看样例数据</div>
+                )
+              )}
             </div>
           </div>
         </div>
@@ -1619,7 +1772,7 @@ const DatasetRecallCard = ({ msg, onConfirm }) => {
 // --- HomeView：集成多轮对话流引擎 ---
 const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, suggestionsMap, setIsNavCollapsed, setIsChatCollapsed }) => {
   const [inputText, setInputText] = useState('');
-  const [activeFiles, setActiveFiles] = useState([{ name: '用户通信费用日表.csv', size: '13.39k' }]);
+  const [activeFiles, setActiveFiles] = useState([]);
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [analysisMode, setAnalysisMode] = useState('fast');
@@ -1688,6 +1841,12 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [msgVotes, setMsgVotes] = useState({}); // { [msgId]: 'up' | 'down' | null }
   const [htmlFullscreen, setHtmlFullscreen] = useState(false);
   const [htmlQueryMode, setHtmlQueryMode] = useState(false); // 报表问数模式
+  const [editableHtmlCode, setEditableHtmlCode] = useState(''); // 用户可编辑的HTML代码
+  const [htmlCodeEdited, setHtmlCodeEdited] = useState(false); // 代码是否被用户修改过
+  const [reportQAMode, setReportQAMode] = useState(false); // 报表问数子视图
+  const [reportQAMessages, setReportQAMessages] = useState([]); // 报表问数的对话消息
+  const [reportQAInput, setReportQAInput] = useState(''); // 报表问数输入框
+  const [reportQALoading, setReportQALoading] = useState(false); // 报表问数加载状态
   const [boardFormName, setBoardFormName] = useState('');
   const [boardFormDesc, setBoardFormDesc] = useState('');
   const [showBoardCreateModal, setShowBoardCreateModal] = useState(false);
@@ -1833,6 +1992,8 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
           clearInterval(timer);
           setActiveArtifact('preview');
           setHtmlCodeDone(true);
+          setEditableHtmlCode(full);
+          setHtmlCodeEdited(false);
         }
       }, 2);
       return () => clearInterval(timer);
@@ -2194,7 +2355,7 @@ ${messages.map(msg => {
       const safeTitle = originalQuery.trim() || '页面原型';
       const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
       const fileName = `${fileBase}.html`;
-      const code = TEMPLATE_HTML_WITH_CSS.replace('上海产业园区春节前后人流数据分析报告', safeTitle);
+      const code = TEMPLATE_HTML_WITH_CSS.replaceAll('上海产业园区春节前后人流数据分析报告', safeTitle);
       const datasetNames = selectedDatasets.map(d => d.name).join('、');
       const responseData = {
         type: 'html_prototype',
@@ -2352,7 +2513,7 @@ ${messages.map(msg => {
     }
 
     const templateTitle = htmlTemplates.find(t => t.id === selectedTemplateId)?.title || '';
-    const responseData = await simulateAIResponse(text, generationType, templateTitle);
+    const responseData = await simulateAIResponse(text, generationType, templateTitle, activeFiles);
 
     if (generationType === 'board' && (responseData.type === 'board_dashboard' || responseData.type === 'board_filter_change' || responseData.type === 'board_column_change')) {
       const aiMsgId = Date.now() + 1;
@@ -2485,6 +2646,61 @@ ${messages.map(msg => {
     setActiveArtifact('sql');
   };
 
+  // 报表问数发送消息
+  const handleReportQASend = () => {
+    const text = reportQAInput.trim();
+    if (!text || reportQALoading) return;
+    const userMsg = { id: Date.now(), role: 'user', content: text };
+    setReportQAMessages(prev => [...prev, userMsg]);
+    setReportQAInput('');
+    setReportQALoading(true);
+
+    const datasetNames = activeFiles.map(f => f.name).join('、') || '当前报表数据';
+    const q = text.toLowerCase();
+    let resultLabel = text.replace(/[是多少？?。]/g, '').trim();
+    let resultValue = '';
+    let sql = '';
+    let trend = 'up';
+    if (q.includes('环比')) {
+      resultValue = '+12.6%';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT period, ROUND((cur - LAG(cur) OVER(ORDER BY period)) / LAG(cur) OVER(ORDER BY period) * 100, 1) AS mom_rate\nFROM metric_summary ORDER BY period DESC LIMIT 1;`;
+    } else if (q.includes('同比')) {
+      resultValue = '+8.3%';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT ROUND((this_year.val - last_year.val) / last_year.val * 100, 1) AS yoy_rate\nFROM yearly_compare LIMIT 1;`;
+    } else if (q.includes('最高') || q.includes('最大') || q.includes('排名')) {
+      resultLabel = '排名第一';
+      resultValue = '张江科技园 · 12,856';
+      trend = 'neutral';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT name, value FROM metric_summary ORDER BY value DESC LIMIT 1;`;
+    } else if (q.includes('总') || q.includes('合计')) {
+      resultLabel = '合计';
+      resultValue = '1,284,562';
+      trend = 'neutral';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT SUM(value) AS total FROM metric_summary;`;
+    } else if (q.includes('趋势') || q.includes('变化')) {
+      resultLabel = '近期趋势';
+      resultValue = '持续上升 ↑';
+      trend = 'up';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT period, value FROM metric_summary ORDER BY period;`;
+    } else {
+      resultValue = '9,832';
+      sql = `-- 基于数据集: ${datasetNames}\nSELECT AVG(value) AS avg_val FROM metric_summary WHERE date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY);`;
+    }
+    const followUps = ['各维度的数据对比如何？', '近三个月的趋势变化？', '异常数据点有哪些？'];
+    setTimeout(() => {
+      setReportQAMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: 'ai',
+        type: 'chat2sql_result',
+        sql,
+        result: { label: resultLabel, value: resultValue, trend },
+        followUpQuestions: followUps,
+        datasetNames,
+      }]);
+      setReportQALoading(false);
+    }, 1500);
+  };
+
   // 通过内联函数直接返回 JSX，避免焦点丢失
   const renderInputBox = () => (
     <div className="w-full bg-white border-2 border-purple-600 rounded-2xl shadow-xl p-2 transition-all focus-within:ring-4 focus-within:ring-purple-100 pointer-events-auto relative">
@@ -2494,7 +2710,7 @@ ${messages.map(msg => {
           请先选择一个报告模版再发送
         </div>
       )}
-      {activeFiles.length > 0 && (
+      {(activeFiles.length > 0 || selectedTemplateId) && (
         <div className="flex flex-wrap items-center gap-2 mb-1">
           {activeFiles.map((file, index) => (
             <div key={index} className="inline-flex items-center gap-2 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200 text-[11px] shadow-sm">
@@ -2722,25 +2938,6 @@ ${messages.map(msg => {
           {generationType === 'explore' && (
             <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} className={`flex items-center justify-center text-xs font-medium transition-colors px-3 py-1.5 rounded-lg border shadow-sm ${webSearchEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-indigo-50 hover:text-indigo-600'}`}>
               <Globe size={14} />
-            </button>
-          )}
-          {generationType === 'html' && latestHtmlMsg && (
-            <button
-              onClick={() => setHtmlQueryMode(!htmlQueryMode)}
-              className={`flex items-center gap-1.5 text-xs font-medium transition-all px-3 py-1.5 rounded-lg border shadow-sm ${
-                htmlQueryMode
-                  ? 'bg-amber-50 text-amber-700 border-amber-200 ring-2 ring-amber-100'
-                  : 'bg-gray-50 text-gray-600 border-transparent hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200'
-              }`}
-              title={htmlQueryMode ? '关闭报表问数模式' : '开启报表问数模式'}
-            >
-              <BarChart2 size={14} />
-              <span>报表问数</span>
-              <div className={`w-7 h-4 rounded-full flex items-center transition-all px-0.5 ${
-                htmlQueryMode ? 'bg-amber-500 justify-end' : 'bg-gray-300 justify-start'
-              }`}>
-                <div className="w-3 h-3 bg-white rounded-full shadow-sm" />
-              </div>
             </button>
           )}
         </div>
@@ -3874,6 +4071,112 @@ ${messages.map(msg => {
             <div className="w-full max-w-none mx-auto flex-1 min-h-0">
               <div className={`grid gap-0 border border-gray-200 rounded-none bg-white h-full min-h-0 overflow-hidden ${showRightPanel ? 'grid-cols-1 lg:grid-cols-[30%_70%]' : 'grid-cols-1'}`}>
                 <div className="border-r border-gray-200 bg-white flex flex-col h-full overflow-hidden">
+                  {reportQAMode ? (
+                    <>
+                      {/* 报表问数顶部 */}
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3 flex-shrink-0 bg-gradient-to-r from-amber-50 to-orange-50">
+                        <button
+                          onClick={() => { setReportQAMode(false); setHtmlQueryMode(false); }}
+                          className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                        >
+                          <ArrowLeft size={16} />
+                          <span>返回</span>
+                        </button>
+                        <div className="h-4 w-px bg-gray-200"></div>
+                        <div className="flex items-center gap-2">
+                          <BarChart2 size={16} className="text-amber-600" />
+                          <span className="text-sm font-semibold text-gray-800">AI问数</span>
+                        </div>
+                        <span className="text-xs text-gray-400 ml-auto">对报表数据进行提问分析</span>
+                      </div>
+                      {/* 报表问数消息区 */}
+                      <div className="px-6 pb-4 pt-4 flex-1 space-y-4 overflow-y-auto min-h-0">
+                        {reportQAMessages.length === 0 && (
+                          <div className="flex flex-col items-center justify-center h-full text-center opacity-60">
+                            <BarChart2 size={40} className="text-amber-300 mb-3" />
+                            <div className="text-sm font-medium text-gray-500 mb-1">报表智能问数</div>
+                            <div className="text-xs text-gray-400 max-w-[240px]">基于当前报表数据，您可以用自然语言提问，AI 将为您生成 SQL 查询并返回分析结果</div>
+                            <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                              {['数据环比变化', '排名最高的是哪个', '总量是多少', '近期趋势如何'].map((q, i) => (
+                                <button key={i} onClick={() => { setReportQAInput(q); }} className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-3 py-1.5 hover:bg-amber-100 transition-colors">{q}</button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {reportQAMessages.map((msg) => (
+                          msg.role === 'user' ? (
+                            <div key={msg.id} className="flex justify-end">
+                              <div className="max-w-[85%] bg-amber-50 text-gray-800 border border-amber-100 px-4 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed">{msg.content}</div>
+                            </div>
+                          ) : (
+                            <div key={msg.id} className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600"><BarChart2 size={14} /></div>
+                              <div className="flex-1 space-y-2">
+                                {msg.type === 'chat2sql_result' && (
+                                  <>
+                                    <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm overflow-hidden">
+                                      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                                        <div className="text-[10px] uppercase tracking-wider text-gray-400 font-bold mb-1">查询结果</div>
+                                        <div className="flex items-baseline gap-2">
+                                          <span className="text-xs text-gray-500">{msg.result.label}</span>
+                                          <span className={`text-lg font-bold ${msg.result.trend === 'up' ? 'text-emerald-600' : msg.result.trend === 'down' ? 'text-red-500' : 'text-gray-800'}`}>{msg.result.value}</span>
+                                          {msg.result.trend === 'up' && <TrendingUp size={14} className="text-emerald-500" />}
+                                        </div>
+                                      </div>
+                                      <div className="px-4 py-2">
+                                        <details className="group">
+                                          <summary className="text-[10px] uppercase tracking-wider text-gray-400 font-bold cursor-pointer hover:text-gray-600 flex items-center gap-1">
+                                            <Code size={10} /> SQL 查询 <ChevronRight size={10} className="group-open:rotate-90 transition-transform" />
+                                          </summary>
+                                          <pre className="text-[11px] bg-gray-50 text-gray-600 p-2 rounded-lg mt-1 whitespace-pre-wrap font-mono">{msg.sql}</pre>
+                                        </details>
+                                      </div>
+                                    </div>
+                                    {msg.followUpQuestions && (
+                                      <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {msg.followUpQuestions.map((q, i) => (
+                                          <button key={i} onClick={() => { setReportQAInput(q); }} className="text-xs bg-gray-50 text-gray-600 border border-gray-200 rounded-full px-2.5 py-1 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 transition-colors">{q}</button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                        {reportQALoading && (
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600"><BarChart2 size={14} /></div>
+                            <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-500 flex items-center gap-2">
+                              <Loader2 size={14} className="animate-spin text-amber-500" /> 正在分析报表数据...
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {/* 报表问数输入框 */}
+                      <div className="px-4 pb-4 mt-auto flex-shrink-0">
+                        <div className="flex items-center gap-2 bg-white border-2 border-amber-400 rounded-xl px-3 py-2 focus-within:ring-4 focus-within:ring-amber-100 shadow-sm">
+                          <BarChart2 size={16} className="text-amber-500 flex-shrink-0" />
+                          <input
+                            value={reportQAInput}
+                            onChange={(e) => setReportQAInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReportQASend(); } }}
+                            placeholder="输入您想查询的数据问题..."
+                            className="flex-1 text-sm border-none focus:ring-0 focus:outline-none bg-transparent placeholder-gray-400"
+                          />
+                          <button
+                            onClick={handleReportQASend}
+                            disabled={reportQALoading || !reportQAInput.trim()}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${reportQALoading || !reportQAInput.trim() ? 'bg-gray-100 text-gray-300' : 'bg-amber-500 text-white hover:bg-amber-600 shadow-sm'}`}
+                          >
+                            {reportQALoading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
 
                   <div ref={leftChatRef} className="px-6 pb-4 pt-[40px] flex-1 space-y-4 overflow-y-auto min-h-0">
                     {messages.map((msg) => (
@@ -4002,6 +4305,8 @@ ${messages.map(msg => {
                   <div className="px-6 pb-6 mt-auto">
                     {renderInputBox()}
                   </div>
+                    </>
+                  )}
                 </div>
 
                 {showRightPanel && <div className="bg-white flex flex-col h-full overflow-hidden">
@@ -4074,6 +4379,15 @@ ${messages.map(msg => {
                                 src={`${publicBase}yuanqu/index.html`}
                                 onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
                               />
+                              {/* AI问数入口 */}
+                              <button
+                                onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
+                                className="absolute bottom-[72px] right-4 z-20 px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
+                                title="AI问数 - 对报表数据进行提问"
+                              >
+                                <BarChart2 size={14} />
+                                <span>AI问数</span>
+                              </button>
                               {/* 悬浮选择按钮 */}
                               <button
                                 onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
@@ -4124,21 +4438,51 @@ ${messages.map(msg => {
                             </div>
                           </div>
                         ) : (
-                          <div className="relative h-full">
-                            <button
-                              onClick={() => {
-                                const code = (activeArtifact === 'sql' && streamedCodeById.sql) || (activeArtifact === 'python' && streamedCodeById.python) || (activeArtifact === 'html' && streamedCodeById.html) || '';
-                                handleCopyCode(code, `sync-${activeArtifact}`);
-                              }}
-                              className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
-                            >
-                              {copiedCodeId === `sync-${activeArtifact}` ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
-                            </button>
-                            <pre ref={codeScrollRef} className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
-                              {activeArtifact === 'sql' && htmlStage >= 1 && streamedCodeById.sql}
-                              {activeArtifact === 'python' && htmlStage >= 2 && streamedCodeById.python}
-                              {activeArtifact === 'html' && htmlStage >= 3 && streamedCodeById.html}
-                            </pre>
+                          <div className="relative h-full flex flex-col">
+                            <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                              {activeArtifact === 'html' && htmlCodeDone && htmlCodeEdited && (
+                                <button
+                                  onClick={() => {
+                                    const iframe = previewIframeRef.current;
+                                    if (iframe) {
+                                      iframe.srcdoc = editableHtmlCode;
+                                    }
+                                    setStreamedCodeById(prev => ({ ...prev, html: editableHtmlCode }));
+                                    setHtmlCodeEdited(false);
+                                    setActiveArtifact('preview');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                                >
+                                  <Eye size={12} /> 应用预览
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  const code = (activeArtifact === 'sql' && streamedCodeById.sql) || (activeArtifact === 'python' && streamedCodeById.python) || (activeArtifact === 'html' && (editableHtmlCode || streamedCodeById.html)) || '';
+                                  handleCopyCode(code, `sync-${activeArtifact}`);
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
+                              >
+                                {copiedCodeId === `sync-${activeArtifact}` ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                              </button>
+                            </div>
+                            {activeArtifact === 'html' && htmlCodeDone ? (
+                              <textarea
+                                value={editableHtmlCode || streamedCodeById.html}
+                                onChange={(e) => {
+                                  setEditableHtmlCode(e.target.value);
+                                  setHtmlCodeEdited(true);
+                                }}
+                                className="flex-1 text-xs bg-[#f8fafc] text-gray-700 p-6 font-mono whitespace-pre resize-none focus:outline-none focus:ring-0 border-none h-full overflow-y-auto"
+                                spellCheck={false}
+                              />
+                            ) : (
+                              <pre ref={codeScrollRef} className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
+                                {activeArtifact === 'sql' && htmlStage >= 1 && streamedCodeById.sql}
+                                {activeArtifact === 'python' && htmlStage >= 2 && streamedCodeById.python}
+                                {activeArtifact === 'html' && htmlStage >= 3 && streamedCodeById.html}
+                              </pre>
+                            )}
                           </div>
                         )}
                       </div>
@@ -4185,16 +4529,40 @@ ${messages.map(msg => {
                           </div>
                           <div className="flex-1 overflow-hidden min-h-0">
                             {openedFile === 'html' ? (
-                              <div className="relative h-full">
-                                <button
-                                  onClick={() => handleCopyCode(streamedCodeById.html || latestHtmlMsg.code, 'file-html')}
-                                  className="absolute top-3 right-3 z-10 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
-                                >
-                                  {copiedCodeId === 'file-html' ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
-                                </button>
-                                <pre className="text-xs bg-[#f8fafc] text-gray-700 p-6 whitespace-pre-wrap h-full max-h-full overflow-y-auto">
-                                  {streamedCodeById.html || latestHtmlMsg.code}
-                                </pre>
+                              <div className="relative h-full flex flex-col">
+                                <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                                  {htmlCodeEdited && (
+                                    <button
+                                      onClick={() => {
+                                        const iframe = previewIframeRef.current;
+                                        if (iframe) {
+                                          iframe.srcdoc = editableHtmlCode;
+                                        }
+                                        setStreamedCodeById(prev => ({ ...prev, html: editableHtmlCode }));
+                                        setHtmlCodeEdited(false);
+                                        setOpenedFile('html_preview');
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                                    >
+                                      <Eye size={12} /> 应用预览
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleCopyCode(editableHtmlCode || streamedCodeById.html || latestHtmlMsg.code, 'file-html')}
+                                    className="px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors bg-white text-gray-600 hover:bg-gray-100 border border-gray-200 shadow-sm"
+                                  >
+                                    {copiedCodeId === 'file-html' ? <><Check size={12} className="text-green-500" /> 已复制</> : <><Copy size={12} /> 复制代码</>}
+                                  </button>
+                                </div>
+                                <textarea
+                                  value={editableHtmlCode || streamedCodeById.html || latestHtmlMsg.code}
+                                  onChange={(e) => {
+                                    setEditableHtmlCode(e.target.value);
+                                    setHtmlCodeEdited(true);
+                                  }}
+                                  className="flex-1 text-xs bg-[#f8fafc] text-gray-700 p-6 font-mono whitespace-pre resize-none focus:outline-none focus:ring-0 border-none h-full overflow-y-auto"
+                                  spellCheck={false}
+                                />
                               </div>
                             ) : openedFile === 'html_preview' ? (
                               <div className="relative w-full h-full">
@@ -4209,6 +4577,15 @@ ${messages.map(msg => {
                                   src={`${publicBase}yuanqu/index.html`}
                                   onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
                                 />
+                                {/* AI问数入口 */}
+                                <button
+                                  onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
+                                  className="absolute bottom-[72px] right-4 z-20 px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
+                                  title="AI问数 - 对报表数据进行提问"
+                                >
+                                  <BarChart2 size={14} />
+                                  <span>AI问数</span>
+                                </button>
                                 {/* 悬浮选择按钮 */}
                                 <button
                                   onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
