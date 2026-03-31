@@ -82,6 +82,7 @@ import {
   List,
   Type as TextIcon,
   Download,
+  Heart,
   Code,
   Copy,
   Check,
@@ -137,6 +138,26 @@ const styles = `
     animation: float-squirrel 4s infinite ease-in-out;
   }
 `;
+
+// --- 即时 Tooltip 组件 ---
+const Tooltip = ({ children, text, position = 'top', align = 'center', className = '' }) => {
+  const [visible, setVisible] = useState(false);
+  const alignClass = align === 'right' ? 'right-0' : align === 'left' ? 'left-0' : 'left-1/2 -translate-x-1/2';
+  const posClass = position === 'bottom'
+    ? `top-full mt-1.5 ${alignClass}`
+    : `bottom-full mb-1.5 ${alignClass}`;
+  const isAbsolute = className.includes('absolute');
+  return (
+    <span className={`${isAbsolute ? '' : 'relative'} inline-flex ${className}`} onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)}>
+      {children}
+      {visible && text && (
+        <span className={`absolute ${posClass} z-[999] px-2 py-1 text-xs text-white bg-gray-800 rounded-lg shadow-lg whitespace-nowrap pointer-events-none`}>
+          {text}
+        </span>
+      )}
+    </span>
+  );
+};
 
 const TEMPLATE_CSS_RAW = `
 /* 全局样式重置 */
@@ -764,7 +785,26 @@ const simulateAIResponse = (query, mode = 'qa', templateTitle = '', userSelected
         return;
       }
       if (mode === 'html') {
-        // 第一步：根据语义召回相关数据集，让用户确认
+        // 如果用户已选择数据集，跳过召回，直接生成 HTML
+        if (userSelectedFiles.length > 0) {
+          const safeTitle = query.trim() || '页面原型';
+          const fileBase = safeTitle.replace(/\s+/g, '').slice(0, 8) || 'prototype';
+          const fileName = `${fileBase}.html`;
+          const code = TEMPLATE_HTML_WITH_CSS.replaceAll('上海产业园区春节前后人流数据分析报告', safeTitle);
+          const datasetNames = userSelectedFiles.map(f => f.name).join('、');
+          resolve({
+            type: 'html_prototype',
+            title: safeTitle,
+            fileName,
+            confirmedDatasets: userSelectedFiles.map(f => ({ name: f.name, size: f.size || '' })),
+            code,
+            sql: `-- 基于数据集: ${datasetNames}\nSELECT province_id, SUM(call_fee) AS call_revenue\nFROM user_comm_fee_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY province_id\nORDER BY call_revenue DESC;`,
+            python: `# 基于数据集: ${datasetNames}\nimport pandas as pd\n\ndf = pd.read_csv("user_comm_fee_daily.csv")\nresult = (\n    df.query("stat_date >= '2025-01-01' and stat_date <= '2025-12-31'")\n      .groupby("province_id", as_index=False)["call_fee"].sum()\n      .sort_values("call_fee", ascending=False)\n)\nprint(result.head())`,
+            previewHtml: code
+          });
+          return;
+        }
+        // 未选择数据集，根据语义召回相关数据集，让用户确认
         const allDatasets = [
           { id: 'ds-1', name: '用户通信费用日表', size: '13.39k', desc: '包含用户每日通话、流量、短信等通信费用明细' },
           { id: 'ds-2', name: '经营分析数据集', size: '45.2MB', desc: '月度经营指标汇总，涵盖收入、成本、利润等' },
@@ -823,10 +863,7 @@ const simulateAIResponse = (query, mode = 'qa', templateTitle = '', userSelected
         // 合并：用户选择的数据集排在最前面，然后是语义召回的
         const semanticDatasets = allDatasets.filter(ds => matchedIds.has(ds.id));
         const recalledDatasets = [...userExtraDatasets, ...semanticDatasets];
-        const userSelectedCount = userSelectedFiles.length;
-        const recallText = userSelectedCount > 0
-          ? `已根据您的需求「${query}」语义分析，并结合您选择的 ${userSelectedCount} 个数据集，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`
-          : `已根据您的需求「${query}」语义分析，从 ${allDatasets.length} 个数据集中召回了 ${recalledDatasets.length} 个相关数据集。请选择要使用的数据集后确认生成：`;
+        const recallText = `已根据您的需求，召回了${recalledDatasets.length}个相关的数据集，请选择要使用的数据集后确认生成`;
         resolve({
           type: 'dataset_recall',
           text: recallText,
@@ -1013,15 +1050,15 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
   const [activePreview, setActivePreview] = useState(null); // 当前预览的数据集 id
 
   const datasets = [
-    { id: '1', name: '用户流失明细表' },
-    { id: '2', name: '流失用户画像宽表' },
-    { id: '3', name: '用户挽留行为记录' },
-    { id: '4', name: '流失预警评分表' },
-    { id: '5', name: '用户通信费用日表' },
-    { id: '6', name: '用户套餐订购表' },
-    { id: '7', name: '客户投诉工单表' },
-    { id: '8', name: '各省份月度营收表' },
-    { id: '9', name: '营业厅业务办理表' },
+    { id: '1', name: '用户流失明细表', desc: '用户流失详情，含流失时间、原因、ARPU等字段' },
+    { id: '2', name: '流失用户画像宽表', desc: '流失用户属性画像，含年龄、套餐、用量等特征' },
+    { id: '3', name: '用户挽留行为记录', desc: '挽留动作记录，含渠道、策略及挽留效果' },
+    { id: '4', name: '流失预警评分表', desc: '用户流失风险评分，含风险等级和关键因子' },
+    { id: '5', name: '用户通信费用日表', desc: '包含用户每日通话、流量、短信等通信费用明细' },
+    { id: '6', name: '用户套餐订购表', desc: '各类套餐内容、订购量及使用情况明细' },
+    { id: '7', name: '客户投诉工单表', desc: '客户投诉工单记录，含分类、处理时长和满意度' },
+    { id: '8', name: '各省份月度营收表', desc: '各省份月度营收数据，含主营收入与增值收入' },
+    { id: '9', name: '营业厅业务办理表', desc: '各属地营业厅业务办理量与业绩考核数据' },
   ];
 
   // 每个数据集对应的字段定义
@@ -1580,14 +1617,11 @@ const ALL_SEARCHABLE_DATASETS = [
   { id: 'ds-15', name: '增值业务订购表', size: '6.1MB', desc: '各类增值业务的订购量与退订率统计' },
 ];
 
-const DatasetRecallCard = ({ msg, onConfirm }) => {
+const DatasetRecallCard = ({ msg, onConfirm, onOpenDatasetModal }) => {
   // 合并召回的数据集和可能手动添加的数据集
   const [displayDatasets, setDisplayDatasets] = useState(() => msg.datasets);
   const [selected, setSelected] = useState(() => msg.datasets.map(d => d.id));
   const [confirmed, setConfirmed] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef(null);
   // 记录手动添加的 id
   const [manuallyAdded, setManuallyAdded] = useState(new Set());
 
@@ -1603,30 +1637,26 @@ const DatasetRecallCard = ({ msg, onConfirm }) => {
     onConfirm(selectedDatasets, msg.originalQuery);
   };
 
-  const handleAddFromSearch = (ds) => {
-    if (displayDatasets.some(d => d.id === ds.id)) return;
-    setDisplayDatasets(prev => [...prev, ds]);
-    setSelected(prev => [...prev, ds.id]);
-    setManuallyAdded(prev => new Set(prev).add(ds.id));
-    setSearchQuery('');
+  const handleRemoveDataset = (id) => {
+    if (confirmed) return;
+    setDisplayDatasets(prev => prev.filter(d => d.id !== id));
+    setSelected(prev => prev.filter(i => i !== id));
+    setManuallyAdded(prev => { const s = new Set(prev); s.delete(id); return s; });
   };
 
-  const handleOpenSearch = () => {
-    setShowSearch(true);
-    setTimeout(() => searchInputRef.current?.focus(), 100);
+  // 供外部（DatasetSelectionModal）调用，批量添加数据集
+  const handleAddDatasetsFromModal = (modalDatasets) => {
+    if (confirmed) return;
+    const newDs = modalDatasets
+      .filter(ds => !displayDatasets.some(d => d.name === ds.name))
+      .map(ds => ({ id: ds.id || `modal-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, name: ds.name, desc: ds.desc || '', size: ds.size || '' }));
+    if (newDs.length === 0) return;
+    setDisplayDatasets(prev => [...prev, ...newDs]);
+    setSelected(prev => [...prev, ...newDs.map(d => d.id)]);
+    setManuallyAdded(prev => { const s = new Set(prev); newDs.forEach(d => s.add(d.id)); return s; });
   };
 
-  // 搜索过滤：排除已在 displayDatasets 中的，按名称和描述模糊匹配
-  const searchResults = searchQuery.trim()
-    ? ALL_SEARCHABLE_DATASETS
-      .filter(ds => !displayDatasets.some(d => d.id === ds.id))
-      .filter(ds => {
-        const q = searchQuery.toLowerCase();
-        return ds.name.toLowerCase().includes(q) || ds.desc.toLowerCase().includes(q);
-      })
-    : [];
-
-  const renderDatasetItem = (ds, isManual = false) => (
+  const renderDatasetItem = (ds) => (
     <div
       key={ds.id}
       onClick={() => toggle(ds.id)}
@@ -1643,16 +1673,18 @@ const DatasetRecallCard = ({ msg, onConfirm }) => {
         {selected.includes(ds.id) && <Check size={12} className="text-white" />}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${selected.includes(ds.id) ? 'text-emerald-700' : 'text-gray-700'}`}>{ds.name}</span>
-          <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{ds.size}</span>
-          {isManual && (
-            <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 font-medium">手动添加</span>
-          )}
-        </div>
+        <span className={`text-sm font-medium ${selected.includes(ds.id) ? 'text-emerald-700' : 'text-gray-700'}`}>{ds.name}</span>
         <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>
       </div>
-      <FileSpreadsheet size={16} className={`flex-shrink-0 ${selected.includes(ds.id) ? 'text-emerald-400' : 'text-gray-300'}`} />
+      {!confirmed && (
+        <button
+          onClick={(e) => { e.stopPropagation(); handleRemoveDataset(ds.id); }}
+          className="flex-shrink-0 p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+          title="删除数据集"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 
@@ -1664,105 +1696,53 @@ const DatasetRecallCard = ({ msg, onConfirm }) => {
       <div className="flex-1 bg-white border border-gray-200 rounded-2xl rounded-tl-sm shadow-sm p-5">
         <div className="flex items-center gap-2 mb-3">
           <Database size={16} className="text-emerald-600" />
-          <span className="text-sm font-bold text-gray-800">语义召回数据集</span>
-          <span className="text-xs text-gray-400 ml-auto">共召回 {msg.datasets.length} 个</span>
+          <span className="text-sm font-bold text-gray-800">召回数据集</span>
         </div>
-        <p className="text-sm text-gray-600 mb-4 leading-relaxed">{msg.text}</p>
-
-        {/* 数据集列表 */}
-        <div className="space-y-2 mb-3">
-          {displayDatasets.map(ds => renderDatasetItem(ds, manuallyAdded.has(ds.id)))}
-        </div>
-
-        {/* 搜索添加区域 */}
-        {!confirmed && (
-          <div className="mb-4">
-            {!showSearch ? (
+        {!confirmed ? (
+          <>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">已根据您的需求，召回了{displayDatasets.length}个相关的数据集，请选择要使用的数据集后确认生成</p>
+            <div className="space-y-2 mb-3">
+              {displayDatasets.map(ds => renderDatasetItem(ds))}
+            </div>
+            <div className="mb-4">
               <button
-                onClick={handleOpenSearch}
+                onClick={() => onOpenDatasetModal && onOpenDatasetModal(handleAddDatasetsFromModal)}
                 className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors py-1"
               >
-                <Search size={12} />
-                找不到需要的数据集？点击搜索添加
+                <Plus size={12} />
+                添加数据集
               </button>
-            ) : (
-              <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/30 animate-in fade-in slide-in-from-top-1 duration-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <Search size={14} className="text-blue-500 flex-shrink-0" />
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="输入数据集名称搜索..."
-                    className="flex-1 bg-white border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
-                  />
-                  <button
-                    onClick={() => { setShowSearch(false); setSearchQuery(''); }}
-                    className="text-gray-400 hover:text-gray-600 p-1"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-
-                {searchQuery.trim() && (
-                  <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-                    {searchResults.length > 0 ? (
-                      searchResults.map(ds => (
-                        <div
-                          key={ds.id}
-                          onClick={() => handleAddFromSearch(ds)}
-                          className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 bg-white hover:border-blue-300 hover:bg-blue-50/50 cursor-pointer transition-all group"
-                        >
-                          <div className="w-5 h-5 rounded border-2 border-dashed border-blue-300 flex items-center justify-center flex-shrink-0 group-hover:border-blue-500 group-hover:bg-blue-500 transition-colors">
-                            <Plus size={10} className="text-blue-400 group-hover:text-white transition-colors" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700 transition-colors">{ds.name}</span>
-                              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{ds.size}</span>
-                            </div>
-                            <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>
-                          </div>
-                          <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">点击添加</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-xs text-gray-400">
-                        未找到匹配「{searchQuery}」的数据集
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!searchQuery.trim() && (
-                  <div className="text-xs text-gray-400 text-center py-2">
-                    输入关键词搜索全部 {ALL_SEARCHABLE_DATASETS.length} 个数据集
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 底部操作区 */}
-        {!confirmed ? (
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs text-gray-400">
-              已选择 {selected.length} 个数据集{manuallyAdded.size > 0 ? `（含 ${manuallyAdded.size} 个手动添加）` : ''}
-            </span>
-            <button
-              onClick={handleConfirm}
-              disabled={selected.length === 0}
-              className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-            >
-              <Sparkles size={14} /> 确认并生成
-            </button>
-          </div>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-gray-400">
+                已选择 {selected.length} 个数据集
+              </span>
+              <button
+                onClick={handleConfirm}
+                disabled={selected.length === 0}
+                className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                <Sparkles size={14} /> 确认并生成
+              </button>
+            </div>
+          </>
         ) : (
-          <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
-            <Check size={14} /> 已确认，正在基于 {selected.length} 个数据集生成 HTML 页面...
-          </div>
+          <>
+            <p className="text-sm text-gray-600 mb-4 leading-relaxed">已根据您的需求，召回了{selected.length}个相关的数据集</p>
+            <div className="space-y-2 mb-3">
+              {displayDatasets.filter(ds => selected.includes(ds.id)).map(ds => (
+                <div key={ds.id} className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <div className="w-5 h-5 rounded border-2 bg-emerald-500 border-emerald-500 flex items-center justify-center flex-shrink-0">
+                    <Check size={12} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-emerald-700">{ds.name}</span>
+                    {ds.desc && <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -1823,6 +1803,8 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [selectedElInfo, setSelectedElInfo] = useState(null); // { tag, text, rect, path }
   const [editInstruction, setEditInstruction] = useState('');
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
+  const [directEditMode, setDirectEditMode] = useState(false);
+  const [showAIEditModal, setShowAIEditModal] = useState(false);
   // Board (智能看板) state
   const [boardDashboardVisible, setBoardDashboardVisible] = useState(false);
   const [boardTitle, setBoardTitle] = useState('');
@@ -1878,6 +1860,7 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const codeScrollRef = useRef(null);
   const previewIframeRef = useRef(null);
   const leftChatRef = useRef(null);
+  const recallAddCallbackRef = useRef(null);
 
   const modelOptions = ['qwen3-max', 'qwen3-32b', 'Qwen3-30B-A3B', 'qwen3-coder-plus', 'deepseek-v3.2', 'qwen2-72b-instruct'];
   const htmlTemplates = [
@@ -2144,13 +2127,20 @@ ${messages.map(msg => {
       if (lastHovered) lastHovered.classList.remove('__hover_highlight');
 
       const el = e.target;
+      const tag = el.tagName.toLowerCase();
+      // 点击背景等非内容元素时，取消选择
+      if (tag === 'body' || tag === 'html' || el === doc.documentElement || el === doc.body) {
+        setSelectedElInfo(null);
+        return;
+      }
+
       el.classList.add('__selected_highlight');
 
       // 获取元素信息
       const iframeRect = iframe.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       setSelectedElInfo({
-        tag: el.tagName.toLowerCase(),
+        tag,
         text: el.innerText?.slice(0, 80) || '',
         className: el.className.replace(/__\w+_highlight/g, '').trim(),
         // 相对于 iframe 容器的位置
@@ -2228,6 +2218,43 @@ ${messages.map(msg => {
     restoreSnapshot(nextSnapshot);
   };
 
+  // 直接编辑模式
+  const handleDirectEdit = () => {
+    if (!selectedElInfo?.element) return;
+    const snapshot = saveSnapshot();
+    if (snapshot) { setUndoStack(prev => [...prev, snapshot]); setRedoStack([]); }
+    const el = selectedElInfo.element;
+    el.contentEditable = 'true';
+    el.style.outline = '2px solid #3b82f6';
+    el.style.outlineOffset = '2px';
+    el.style.minHeight = '1em';
+    el.focus();
+    setDirectEditMode(true);
+    // select all text
+    try {
+      const iframeDoc = previewIframeRef.current?.contentDocument;
+      if (iframeDoc) { const range = iframeDoc.createRange(); range.selectNodeContents(el); const sel = iframeDoc.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
+    } catch (e) { /* ignore */ }
+    const finishEdit = () => {
+      el.contentEditable = 'false';
+      el.style.outline = '';
+      el.style.outlineOffset = '';
+      el.classList.remove('__selected_highlight');
+      setDirectEditMode(false);
+      setSelectedElInfo(null);
+    };
+    el.addEventListener('blur', finishEdit, { once: true });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); el.blur(); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); el.blur(); }
+    });
+  };
+
+  // 打开 AI 修改弹窗
+  const handleOpenAIEdit = () => {
+    setShowAIEditModal(true);
+  };
+
   const handleApplyEdit = () => {
     if (!editInstruction.trim() || !selectedElInfo?.element) return;
     setIsApplyingEdit(true);
@@ -2236,7 +2263,7 @@ ${messages.map(msg => {
     const elementDesc = selectedElInfo.text?.slice(0, 30) || `<${selectedElInfo.tag}>`;
 
     // 1. 左侧发送用户消息
-    const userMsg = { id: Date.now(), role: 'user', content: `[选中元素: ${elementDesc}] ${instruction}` };
+    const userMsg = { id: Date.now(), role: 'user', content: instruction };
     setMessages(prev => [...prev, userMsg]);
 
     // 保存当前状态到 undoStack
@@ -2282,13 +2309,14 @@ ${messages.map(msg => {
         id: Date.now() + 1,
         role: 'ai',
         type: 'edit_reply',
-        text: `${actionDesc}。\n\n针对「${elementDesc}」的修改已应用到右侧预览中，请查看效果。如需调整可继续选择元素修改，或点击撤销恢复。`,
+        text: `修改已完成，请查看效果。如需调整可继续选择元素修改，或点击撤销或前进恢复。`,
       };
       setMessages(prev => [...prev, aiMsg]);
 
       setIsApplyingEdit(false);
       setSelectedElInfo(null);
       setEditInstruction('');
+      setShowAIEditModal(false);
       const iframe = previewIframeRef.current;
       if (iframe?.contentDocument) {
         iframe.contentDocument.querySelectorAll('.__selected_highlight').forEach(node => node.classList.remove('__selected_highlight'));
@@ -2344,6 +2372,8 @@ ${messages.map(msg => {
 
   // 用户在 dataset_recall 确认后触发 HTML 生成
   const handleDatasetRecallConfirm = (selectedDatasets, originalQuery) => {
+    // 更新 dataset_recall 消息，附上已确认的数据集，用于左侧面板只读展示
+    setMessages(prev => prev.map(m => m.type === 'dataset_recall' ? { ...m, confirmedDatasets: selectedDatasets } : m));
     // 发一条用户确认消息
     const confirmMsg = { id: Date.now(), role: 'user', content: `使用「${selectedDatasets.map(d => d.name).join('、')}」生成页面` };
     setMessages(prev => [...prev, confirmMsg]);
@@ -2361,6 +2391,7 @@ ${messages.map(msg => {
         type: 'html_prototype',
         title: safeTitle,
         fileName,
+        confirmedDatasets: selectedDatasets,
         code,
         sql: `-- 基于数据集: ${datasetNames}\nSELECT province_id, SUM(call_fee) AS call_revenue\nFROM user_comm_fee_daily\nWHERE stat_date BETWEEN '2025-01-01' AND '2025-12-31'\nGROUP BY province_id\nORDER BY call_revenue DESC;`,
         python: `# 基于数据集: ${datasetNames}\nimport pandas as pd\n\ndf = pd.read_csv("user_comm_fee_daily.csv")\nresult = (\n    df.query("stat_date >= '2025-01-01' and stat_date <= '2025-12-31'")\n      .groupby("province_id", as_index=False)["call_fee"].sum()\n      .sort_values("call_fee", ascending=False)\n)\nprint(result.head())`,
@@ -2849,32 +2880,40 @@ ${messages.map(msg => {
       <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-50">
         <div className="flex items-center gap-3">
           <div className="flex bg-gray-100 p-0.5 rounded-lg">
-            <button onClick={() => setAnalysisMode('fast')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'fast' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              <Zap size={14} />
-            </button>
-            <button onClick={() => setAnalysisMode('deep')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'deep' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              <BrainCircuit size={14} />
-            </button>
+            <Tooltip text="快速分析">
+              <button onClick={() => setAnalysisMode('fast')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'fast' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                <Zap size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip text="深度分析">
+              <button onClick={() => setAnalysisMode('deep')} className={`flex items-center justify-center px-3 py-1.5 text-xs font-medium rounded-md transition-all ${analysisMode === 'deep' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                <BrainCircuit size={14} />
+              </button>
+            </Tooltip>
           </div>
 
           <div className="h-5 w-px bg-gray-200"></div>
 
-          <button onClick={() => setShowDatasetModal(true)} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-200 transition-colors shadow-sm">
-            <Database size={14} />
-          </button>
+          <Tooltip text="选择数据集">
+            <button onClick={() => setShowDatasetModal(true)} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-200 transition-colors shadow-sm">
+              <Database size={14} />
+            </button>
+          </Tooltip>
           {generationType === 'html' && (
             <div className="relative">
-              <button
-                onClick={() => { setTempSelectedTemplateId(selectedTemplateId); setShowTemplateMenu(true); setShowTemplateWarning(false); }}
-                className={`flex items-center justify-center text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${showTemplateWarning ? 'text-red-600 bg-red-50 border-red-300 animate-pulse' : !selectedTemplateId ? 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' : 'text-gray-600 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 border-transparent hover:border-emerald-200'}`}
-              >
-                <LayoutTemplate size={14} />
-              </button>
+              <Tooltip text="选择报告模板">
+                <button
+                  onClick={() => { setTempSelectedTemplateId(selectedTemplateId); setShowTemplateMenu(true); setShowTemplateWarning(false); }}
+                  className={`flex items-center justify-center text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${showTemplateWarning ? 'text-red-600 bg-red-50 border-red-300 animate-pulse' : !selectedTemplateId ? 'text-orange-600 bg-orange-50 border-orange-200 hover:bg-orange-100' : 'text-gray-600 hover:text-emerald-600 bg-gray-50 hover:bg-emerald-50 border-transparent hover:border-emerald-200'}`}
+                >
+                  <LayoutTemplate size={14} />
+                </button>
+              </Tooltip>
               {showTemplateMenu && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                   <div className="absolute inset-0 bg-black/30" onClick={() => setShowTemplateMenu(false)}></div>
                   <div className="relative w-[760px] bg-white border border-blue-500 rounded-2xl shadow-2xl py-6 px-6">
-                    <button onClick={() => setShowTemplateMenu(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={18} /></button>
+                    <button onClick={() => setShowTemplateMenu(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600" title="关闭"><X size={18} /></button>
                     <div className="text-base font-semibold text-gray-700 mb-6">报告模板选择</div>
                     <div className="grid grid-cols-3 gap-6">
                       {htmlTemplates.map((tpl) => (
@@ -2932,23 +2971,29 @@ ${messages.map(msg => {
               )}
             </div>
           )}
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
-            <FileSpreadsheet size={14} />
-          </button>
-          {generationType === 'explore' && (
-            <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} className={`flex items-center justify-center text-xs font-medium transition-colors px-3 py-1.5 rounded-lg border shadow-sm ${webSearchEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-indigo-50 hover:text-indigo-600'}`}>
-              <Globe size={14} />
+          <Tooltip text="上传数据文件">
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
+              <FileSpreadsheet size={14} />
             </button>
+          </Tooltip>
+          {generationType === 'explore' && (
+            <Tooltip text={webSearchEnabled ? '关闭联网搜索' : '开启联网搜索'}>
+              <button onClick={() => setWebSearchEnabled(!webSearchEnabled)} className={`flex items-center justify-center text-xs font-medium transition-colors px-3 py-1.5 rounded-lg border shadow-sm ${webSearchEnabled ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-gray-50 text-gray-600 border-transparent hover:bg-indigo-50 hover:text-indigo-600'}`}>
+                <Globe size={14} />
+              </button>
+            </Tooltip>
           )}
         </div>
 
-        <button
-          onClick={() => handleSendMessage()}
-          disabled={isLoading || !inputText.trim()}
-          className={`bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 shadow-md transition-all active:scale-95 flex items-center justify-center min-w-[40px] ${isLoading || !inputText.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} className="ml-0.5" />}
-        </button>
+        <Tooltip text="发送">
+          <button
+            onClick={() => handleSendMessage()}
+            disabled={isLoading || !inputText.trim()}
+            className={`bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 shadow-md transition-all active:scale-95 flex items-center justify-center min-w-[40px] ${isLoading || !inputText.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} className="ml-0.5" />}
+          </button>
+        </Tooltip>
       </div>
     </div>
   );
@@ -3107,7 +3152,7 @@ ${messages.map(msg => {
       // 类型: 数据集召回确认（HTML 页面生成流程第一步）
       if (msg.type === 'dataset_recall') {
         return (
-          <DatasetRecallCard key={msg.id} msg={msg} onConfirm={handleDatasetRecallConfirm} />
+          <DatasetRecallCard key={msg.id} msg={msg} onConfirm={handleDatasetRecallConfirm} onOpenDatasetModal={(addCallback) => { recallAddCallbackRef.current = addCallback; setShowDatasetModal(true); }} />
         );
       }
 
@@ -3476,7 +3521,7 @@ ${messages.map(msg => {
     <div className={`flex h-full justify-center overflow-hidden transition-colors duration-500 ${isChatting ? 'bg-[#f4f6f8]' : 'bg-white'}`}>
       <style>{styles}</style>
       <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls" multiple onChange={handleFileUpload} />
-      {showDatasetModal && <DatasetSelectionModal onClose={() => setShowDatasetModal(false)} onConfirm={handleDatasetConfirm} />}
+      {showDatasetModal && <DatasetSelectionModal onClose={() => { setShowDatasetModal(false); recallAddCallbackRef.current = null; }} onConfirm={(selectedDs) => { if (recallAddCallbackRef.current) { recallAddCallbackRef.current(selectedDs); recallAddCallbackRef.current = null; } else { handleDatasetConfirm(selectedDs); } setShowDatasetModal(false); }} />}
 
       {/* 创建智能看板弹窗 */}
       {showBoardCreateModal && (
@@ -4195,6 +4240,28 @@ ${messages.map(msg => {
                                 <div className="flex items-center gap-1.5 text-emerald-600 font-medium text-xs mb-1.5"><CheckSquare size={13} /> 修改已完成</div>
                                 <div className="whitespace-pre-line">{msg.text}</div>
                               </div>
+                            ) : msg.type === 'dataset_recall' && msg.confirmedDatasets ? (
+                              /* 已确认的数据集召回：显示文字 + 只读数据集列表 */
+                              <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-4 text-sm text-gray-700 leading-relaxed">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Database size={14} className="text-emerald-600" />
+                                  <span className="text-sm font-bold text-gray-800">召回数据集</span>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-3">{msg.text}</p>
+                                <div className="space-y-1.5">
+                                  {msg.confirmedDatasets.map(ds => (
+                                    <div key={ds.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                                      <div className="w-4 h-4 rounded border-2 bg-emerald-500 border-emerald-500 flex items-center justify-center flex-shrink-0">
+                                        <Check size={10} className="text-white" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-sm font-medium text-emerald-700">{ds.name}</span>
+                                        {ds.desc && <div className="text-xs text-gray-400 mt-0.5 truncate">{ds.desc}</div>}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             ) : (
                               <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 leading-relaxed">
                                 {msg.type === 'html_prototype'
@@ -4247,8 +4314,8 @@ ${messages.map(msg => {
                                 )}
                               </div>
                             )}
-                            {/* 点赞点踩 / 分享 / 重新生成 */}
-                            <div className="flex items-center gap-1 mt-2">
+                            {/* 点赞点踩 / 分享 / 重新生成（数据集召回不显示） */}
+                            {msg.type !== 'dataset_recall' && <div className="flex items-center gap-1 mt-2">
                               <button
                                 onClick={() => setMsgVotes(prev => ({ ...prev, [msg.id]: prev[msg.id] === 'up' ? null : 'up' }))}
                                 className={`p-1.5 rounded-lg transition-colors ${msgVotes[msg.id] === 'up' ? 'text-blue-600 bg-blue-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
@@ -4295,7 +4362,7 @@ ${messages.map(msg => {
                                 className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
                                 title="重新生成"
                               ><RotateCcw size={13} /></button>
-                            </div>
+                            </div>}
                           </div>
                         </div>
                       )
@@ -4337,38 +4404,36 @@ ${messages.map(msg => {
                         <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
                           <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-orange-50 text-orange-600">⋯</span>
                           {latestHtmlMsg.fileName}
-                          <button onClick={toggleFavoriteReport} className={`transition-colors text-sm ${isReportFavorited ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'}`} title={isReportFavorited ? '取消收藏' : '收藏'}>★</button>
                         </div>
                         <div className="flex items-center gap-2 text-xs">
                           <button
                             onClick={() => setActiveArtifact('html')}
-                            className={`px-3 py-1 rounded-full border transition-colors ${activeArtifact !== 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                            className={`px-3 py-1 rounded-full border transition-colors flex items-center gap-1 ${activeArtifact !== 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
                           >
-                            代码
+                            <Code size={12} /> 代码
                           </button>
                           <button
                             onClick={() => setActiveArtifact('preview')}
-                            className={`px-3 py-1 rounded-full border transition-colors ${activeArtifact === 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                            className={`px-3 py-1 rounded-full border transition-colors flex items-center gap-1 ${activeArtifact === 'preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
                           >
-                            预览
+                            <Eye size={12} /> 预览
                           </button>
                           <div className="h-4 w-px bg-gray-200"></div>
                           <button onClick={handleUndo} disabled={undoStack.length === 0} className={`p-1 rounded-md border transition-colors ${undoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="撤销"><Undo2 size={14} /></button>
                           <button onClick={handleRedo} disabled={redoStack.length === 0} className={`p-1 rounded-md border transition-colors ${redoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="前进"><Redo2 size={14} /></button>
+                          <button onClick={() => setHtmlFullscreen(true)} className="p-1 rounded-md border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 transition-colors" title="最大化"><Maximize2 size={14} /></button>
                           <div className="h-4 w-px bg-gray-200"></div>
-                          <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">分享</button>
-                          <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">下载</button>
+                          <button onClick={toggleFavoriteReport} className={`px-3 py-1 rounded-full border flex items-center gap-1 transition-colors ${isReportFavorited ? 'border-red-200 text-red-500 bg-red-50' : 'border-gray-200 text-gray-600 hover:border-red-300'}`}><Heart size={12} className={isReportFavorited ? 'fill-current' : ''} /> {isReportFavorited ? '已收藏' : '收藏'}</button>
+                          <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300 flex items-center gap-1"><Share2 size={12} /> 分享</button>
+                          <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300 flex items-center gap-1"><Download size={12} /> 下载</button>
                         </div>
                       </div>
 
                       <div className="flex-1 overflow-hidden min-h-0">
                         {activeArtifact === 'preview' ? (
                           <div className="h-full flex flex-col overflow-hidden relative">
-                            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex-shrink-0 flex items-center justify-between">
+                            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 text-xs text-gray-500 flex-shrink-0">
                               <span>HTML 页面预览</span>
-                              <button onClick={() => setHtmlFullscreen(true)} className="text-gray-400 hover:text-blue-500 transition-colors" title="最大化预览">
-                                <Maximize2 size={14} />
-                              </button>
                             </div>
                             <div className="flex-1 relative overflow-hidden">
                               <iframe
@@ -4380,55 +4445,81 @@ ${messages.map(msg => {
                                 onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
                               />
                               {/* AI问数入口 */}
-                              <button
-                                onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
-                                className="absolute bottom-[72px] right-4 z-20 px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
-                                title="AI问数 - 对报表数据进行提问"
-                              >
-                                <BarChart2 size={14} />
-                                <span>AI问数</span>
-                              </button>
+                              <Tooltip text="对报表数据进行提问" position="top" align="right" className="absolute bottom-[72px] right-4 z-20">
+                                <button
+                                  onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
+                                  className="px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
+                                >
+                                  <BarChart2 size={14} />
+                                  <span>AI问数</span>
+                                </button>
+                              </Tooltip>
                               {/* 悬浮选择按钮 */}
-                              <button
-                                onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
-                                className={`absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
-                                title={selectionMode ? '退出选择' : '选择元素'}
-                              >
-                                <MousePointer2 size={18} />
-                              </button>
+                              <Tooltip text={selectionMode ? '退出选择模式' : '点击这里可以对报告调整'} position="top" align="right" className="absolute bottom-4 right-4 z-20">
+                                <button
+                                  onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
+                                  className={`w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
+                                >
+                                  <MousePointer2 size={18} />
+                                </button>
+                              </Tooltip>
                               {/* 选择模式遮罩提示 */}
                               {selectionMode && !selectedElInfo && (
                                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
                                   点击报告中的元素进行选择
                                 </div>
                               )}
-                              {/* 选中后的编辑弹窗 */}
-                              {selectedElInfo && (
-                                <div className="absolute bottom-16 right-4 z-30 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                              {/* 选中后的两个操作按钮 */}
+                              {selectedElInfo && !directEditMode && !showAIEditModal && (
+                                <div className="absolute bottom-4 right-16 z-30 flex items-center gap-2">
+                                  <Tooltip text="直接编辑选中元素的内容">
+                                    <button onClick={handleDirectEdit} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-lg text-xs font-medium text-gray-700 hover:border-blue-400 hover:text-blue-600 hover:shadow-xl transition-all">
+                                      <Pencil size={13} /> 直接编辑
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip text="通过AI智能修改选中元素">
+                                    <button onClick={handleOpenAIEdit} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 border border-blue-600 rounded-xl shadow-lg text-xs font-medium text-white hover:bg-blue-700 hover:shadow-xl transition-all">
+                                      <Wand2 size={13} /> AI修改
+                                    </button>
+                                  </Tooltip>
+                                </div>
+                              )}
+                              {/* AI修改弹窗 */}
+                              {showAIEditModal && selectedElInfo && (
+                                <div className="absolute bottom-16 right-4 z-30 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                   <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                                    <div className="text-sm font-bold text-gray-800">编辑选中内容</div>
-                                    <button onClick={() => setSelectedElInfo(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                                    <div className="flex items-center gap-2">
+                                      <Wand2 size={14} className="text-blue-600" />
+                                      <span className="text-sm font-bold text-gray-800">AI 智能修改</span>
+                                    </div>
+                                    <button onClick={() => { setShowAIEditModal(false); setEditInstruction(''); }} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
                                   </div>
                                   <div className="px-4 py-3">
-                                    <div className="bg-gray-50 rounded-xl px-3 py-2 mb-3 border border-gray-100">
-                                      <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">选中元素</div>
-                                      <div className="text-xs text-gray-700 truncate">{selectedElInfo.text || `<${selectedElInfo.tag}>`}</div>
+                                    <div className="text-xs text-gray-500 leading-relaxed mb-3 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                                      <p className="mb-1.5">通过自然语言描述，即可对页面进行智能修改：</p>
+                                      <ul className="space-y-0.5 text-gray-400">
+                                        <li>· 修改内容 — 编辑文字、数值、标题等元素</li>
+                                        <li>· 增删元素 — 在上方/下方/左侧/右侧插入内容，或删除元素</li>
+                                        <li>· 调整样式 — 颜色、字号、字重、间距、背景等</li>
+                                        <li>· 布局变更 — 对齐方式、显示隐藏、排列顺序</li>
+                                      </ul>
                                     </div>
                                     <textarea
                                       value={editInstruction}
                                       onChange={(e) => setEditInstruction(e.target.value)}
-                                      placeholder="用自然语言描述你想要的修改，例如：把这个数字改成红色、放大标题、隐藏这个区域..."
-                                      className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
+                                      placeholder="例如：把这个标题改成红色、在下方添加一行备注、隐藏这个区域..."
+                                      className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
                                       rows={3}
+                                      autoFocus
                                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyEdit(); } }}
                                     />
                                   </div>
                                   <div className="px-4 pb-3 flex justify-end gap-2">
-                                    <button onClick={() => setSelectedElInfo(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
+                                    <button onClick={() => { setShowAIEditModal(false); setEditInstruction(''); }} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
                                     <button
                                       onClick={handleApplyEdit}
                                       disabled={!editInstruction.trim() || isApplyingEdit}
-                                      className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                      className="px-4 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                     >
                                       {isApplyingEdit ? <><Loader2 size={12} className="animate-spin" /> 处理中...</> : <><Wand2 size={12} /> 应用修改</>}
                                     </button>
@@ -4500,30 +4591,29 @@ ${messages.map(msg => {
                                 {openedFile === 'python' && `${latestHtmlMsg.fileName.replace('.html', '')}.py`}
                                 {(openedFile === 'html' || openedFile === 'html_preview') && latestHtmlMsg.fileName}
                               </span>
-                              {(openedFile === 'html' || openedFile === 'html_preview') && (
-                                <button onClick={toggleFavoriteReport} className={`transition-colors ${isReportFavorited ? 'text-orange-400' : 'text-gray-300 hover:text-orange-400'}`} title={isReportFavorited ? '取消收藏' : '收藏'}><Sparkles size={14} /></button>
-                              )}
                             </div>
                             {(openedFile === 'html' || openedFile === 'html_preview') && (
                               <div className="flex items-center gap-2 text-xs">
                                 <button
                                   onClick={() => setOpenedFile('html')}
-                                  className={`px-3 py-1 rounded-full border transition-colors ${openedFile === 'html' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                                  className={`px-3 py-1 rounded-full border transition-colors flex items-center gap-1 ${openedFile === 'html' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
                                 >
-                                  代码
+                                  <Code size={12} /> 代码
                                 </button>
                                 <button
                                   onClick={() => setOpenedFile('html_preview')}
-                                  className={`px-3 py-1 rounded-full border transition-colors ${openedFile === 'html_preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                                  className={`px-3 py-1 rounded-full border transition-colors flex items-center gap-1 ${openedFile === 'html_preview' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
                                 >
-                                  预览
+                                  <Eye size={12} /> 预览
                                 </button>
                                 <div className="h-4 w-px bg-gray-200"></div>
                                 <button onClick={handleUndo} disabled={undoStack.length === 0} className={`p-1 rounded-md border transition-colors ${undoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="撤销"><Undo2 size={14} /></button>
                                 <button onClick={handleRedo} disabled={redoStack.length === 0} className={`p-1 rounded-md border transition-colors ${redoStack.length > 0 ? 'border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`} title="前进"><Redo2 size={14} /></button>
+                                <button onClick={() => setHtmlFullscreen(true)} className="p-1 rounded-md border border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 transition-colors" title="最大化"><Maximize2 size={14} /></button>
                                 <div className="h-4 w-px bg-gray-200"></div>
-                                <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">分享</button>
-                                <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300">下载</button>
+                                <button onClick={toggleFavoriteReport} className={`px-3 py-1 rounded-full border flex items-center gap-1 transition-colors ${isReportFavorited ? 'border-red-200 text-red-500 bg-red-50' : 'border-gray-200 text-gray-600 hover:border-red-300'}`}><Heart size={12} className={isReportFavorited ? 'fill-current' : ''} /> {isReportFavorited ? '已收藏' : '收藏'}</button>
+                                <button onClick={() => { setShowShareModal(true); setShareLinkCopied(false); }} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300 flex items-center gap-1"><Share2 size={12} /> 分享</button>
+                                <button onClick={() => setShowDownloadModal(true)} className="px-3 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-blue-300 flex items-center gap-1"><Download size={12} /> 下载</button>
                               </div>
                             )}
                           </div>
@@ -4566,9 +4656,6 @@ ${messages.map(msg => {
                               </div>
                             ) : openedFile === 'html_preview' ? (
                               <div className="relative w-full h-full">
-                                <button onClick={() => setHtmlFullscreen(true)} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-400 hover:text-blue-500 transition-colors" title="最大化预览">
-                                  <Maximize2 size={14} />
-                                </button>
                                 <iframe
                                   ref={previewIframeRef}
                                   title="html-preview-file"
@@ -4578,53 +4665,79 @@ ${messages.map(msg => {
                                   onLoad={() => { if (selectionMode) { disableSelectionMode(); } }}
                                 />
                                 {/* AI问数入口 */}
-                                <button
-                                  onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
-                                  className="absolute bottom-[72px] right-4 z-20 px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
-                                  title="AI问数 - 对报表数据进行提问"
-                                >
-                                  <BarChart2 size={14} />
-                                  <span>AI问数</span>
-                                </button>
-                                {/* 悬浮选择按钮 */}
-                                <button
-                                  onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
-                                  className={`absolute bottom-4 right-4 z-20 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
-                                  title={selectionMode ? '退出选择' : '选择元素'}
-                                >
-                                  <MousePointer2 size={18} />
-                                </button>
+                                <Tooltip text="对报表数据进行提问" position="top" align="right" className="absolute bottom-[72px] right-4 z-20">
+                                  <button
+                                    onClick={() => { setReportQAMode(true); setHtmlQueryMode(true); }}
+                                    className="px-3 py-2 rounded-full shadow-lg flex items-center gap-1.5 transition-all bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl text-xs font-medium"
+                                  >
+                                    <BarChart2 size={14} />
+                                    <span>AI问数</span>
+                                  </button>
+                                </Tooltip>
+                                <Tooltip text={selectionMode ? "退出选择模式" : "点击这里可以对报告调整"} position="top" align="right" className="absolute bottom-4 right-4 z-20">
+                                  <button
+                                    onClick={() => selectionMode ? disableSelectionMode() : enableSelectionMode()}
+                                    className={`w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all ${selectionMode ? 'bg-blue-600 text-white ring-4 ring-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:shadow-xl hover:border-blue-300'}`}
+                                  >
+                                    <MousePointer2 size={18} />
+                                  </button>
+                                </Tooltip>
                                 {selectionMode && !selectedElInfo && (
                                   <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
                                     点击报告中的元素进行选择
                                   </div>
                                 )}
-                                {selectedElInfo && (
-                                  <div className="absolute bottom-16 right-4 z-30 w-80 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                                {/* 选中后的两个操作按钮 */}
+                                {selectedElInfo && !directEditMode && !showAIEditModal && (
+                                  <div className="absolute bottom-4 right-16 z-30 flex items-center gap-2">
+                                    <Tooltip text="直接编辑选中元素的内容">
+                                      <button onClick={handleDirectEdit} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl shadow-lg text-xs font-medium text-gray-700 hover:border-blue-400 hover:text-blue-600 hover:shadow-xl transition-all">
+                                        <Pencil size={13} /> 直接编辑
+                                      </button>
+                                    </Tooltip>
+                                    <Tooltip text="通过AI智能修改选中元素">
+                                      <button onClick={handleOpenAIEdit} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 border border-blue-600 rounded-xl shadow-lg text-xs font-medium text-white hover:bg-blue-700 hover:shadow-xl transition-all">
+                                        <Wand2 size={13} /> AI修改
+                                      </button>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                                {/* AI修改弹窗 */}
+                                {showAIEditModal && selectedElInfo && (
+                                  <div className="absolute bottom-16 right-4 z-30 w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                                      <div className="text-sm font-bold text-gray-800">编辑选中内容</div>
-                                      <button onClick={() => setSelectedElInfo(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                                      <div className="flex items-center gap-2">
+                                        <Wand2 size={14} className="text-blue-600" />
+                                        <span className="text-sm font-bold text-gray-800">AI 智能修改</span>
+                                      </div>
+                                      <button onClick={() => { setShowAIEditModal(false); setEditInstruction(''); }} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
                                     </div>
                                     <div className="px-4 py-3">
-                                      <div className="bg-gray-50 rounded-xl px-3 py-2 mb-3 border border-gray-100">
-                                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">选中元素</div>
-                                        <div className="text-xs text-gray-700 truncate">{selectedElInfo.text || `<${selectedElInfo.tag}>`}</div>
+                                      <div className="text-xs text-gray-500 leading-relaxed mb-3 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
+                                        <p className="mb-1.5">通过自然语言描述，即可对页面进行智能修改：</p>
+                                        <ul className="space-y-0.5 text-gray-400">
+                                          <li>· 修改内容 — 编辑文字、数值、标题等元素</li>
+                                          <li>· 增删元素 — 在上方/下方/左侧/右侧插入内容，或删除元素</li>
+                                          <li>· 调整样式 — 颜色、字号、字重、间距、背景等</li>
+                                          <li>· 布局变更 — 对齐方式、显示隐藏、排列顺序</li>
+                                        </ul>
                                       </div>
                                       <textarea
                                         value={editInstruction}
                                         onChange={(e) => setEditInstruction(e.target.value)}
-                                        placeholder="用自然语言描述你想要的修改，例如：把这个数字改成红色、放大标题、隐藏这个区域..."
-                                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
+                                        placeholder="例如：把这个标题改成红色、在下方添加一行备注、隐藏这个区域..."
+                                        className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 placeholder:text-gray-300"
                                         rows={3}
+                                        autoFocus
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleApplyEdit(); } }}
                                       />
                                     </div>
                                     <div className="px-4 pb-3 flex justify-end gap-2">
-                                      <button onClick={() => setSelectedElInfo(null)} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
+                                      <button onClick={() => { setShowAIEditModal(false); setEditInstruction(''); }} className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">取消</button>
                                       <button
                                         onClick={handleApplyEdit}
                                         disabled={!editInstruction.trim() || isApplyingEdit}
-                                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                                        className="px-4 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                       >
                                         {isApplyingEdit ? <><Loader2 size={12} className="animate-spin" /> 处理中...</> : <><Wand2 size={12} /> 应用修改</>}
                                       </button>
@@ -5213,7 +5326,7 @@ export default function App() {
   const buildBreadcrumbs = () => {
     const crumbs = [{ label: '首页', action: goHome }];
     if (currentView === 'home') {
-      crumbs.push({ label: genTypeLabel[activeGenType] || '智能问数' });
+      // 首页不显示子标签，只保留"首页"
     } else if (currentView === 'agent-manage') {
       crumbs.push({ label: 'BI智能体' });
       crumbs.push({ label: '智能体管理' });
@@ -6047,10 +6160,8 @@ export default function App() {
                   <div className="flex items-center gap-2 text-sm text-blue-700 font-medium">
                     <FileText size={16} className="text-blue-500" />
                     {templateEditFile.name}
-                    {templateEditFile.size && <span className="text-xs text-blue-400 font-normal">({(templateEditFile.size / 1024).toFixed(1)} KB)</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => editTemplateFileRef.current?.click()} className="text-xs text-blue-600 hover:text-blue-700 font-medium">重新上传</button>
                     <button onClick={() => setTemplateEditFile(null)} className="text-blue-400 hover:text-blue-600"><X size={14} /></button>
                   </div>
                 </div>
