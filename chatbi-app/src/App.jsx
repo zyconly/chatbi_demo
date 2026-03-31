@@ -1047,9 +1047,30 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
   const [selectedDatasets, setSelectedDatasets] = useState([]);
   const [rightTab, setRightTab] = useState('fields');
   const [fieldSearch, setFieldSearch] = useState('');
-  const [activePreview, setActivePreview] = useState(null); // 当前预览的数据集 id
+  const [activePreview, setActivePreview] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const uploadInputRef = useRef(null);
 
-  const datasets = [
+  const handleUploadFile = (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newUploaded = [];
+    for (const file of files) {
+      if (file.size > 50 * 1024 * 1024) { alert(`文件 ${file.name} 超过50M限制`); continue; }
+      const cleanName = file.name.replace(/\.(csv|xlsx)$/i, '');
+      const id = 'upload-' + Date.now() + '-' + cleanName;
+      if (!uploadedFiles.some(f => f.name === cleanName) && !newUploaded.some(f => f.name === cleanName)) {
+        newUploaded.push({ id, name: cleanName, desc: `用户上传文件：${file.name}`, isUploaded: true, fileName: file.name, fileSize: file.size });
+      }
+    }
+    if (newUploaded.length > 0) {
+      setUploadedFiles(prev => [...prev, ...newUploaded]);
+      setSelectedDatasets(prev => [...prev, ...newUploaded.map(f => f.id)]);
+    }
+    e.target.value = '';
+  };
+
+  const builtinDatasets = [
     { id: '1', name: '用户流失明细表', desc: '用户流失详情，含流失时间、原因、ARPU等字段' },
     { id: '2', name: '流失用户画像宽表', desc: '流失用户属性画像，含年龄、套餐、用量等特征' },
     { id: '3', name: '用户挽留行为记录', desc: '挽留动作记录，含渠道、策略及挽留效果' },
@@ -1060,6 +1081,7 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
     { id: '8', name: '各省份月度营收表', desc: '各省份月度营收数据，含主营收入与增值收入' },
     { id: '9', name: '营业厅业务办理表', desc: '各属地营业厅业务办理量与业绩考核数据' },
   ];
+  const datasets = [...uploadedFiles, ...builtinDatasets];
 
   // 每个数据集对应的字段定义
   const fieldsMap = {
@@ -1200,6 +1222,13 @@ const DatasetSelectionModal = ({ onClose, onConfirm }) => {
             <div className="w-32 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-gray-400 flex justify-between items-center cursor-pointer hover:border-blue-400 transition-colors">请选择 <ChevronDown size={14} /></div>
           </div>
           <button className="px-5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg shadow-sm transition-colors">查询</button>
+          <div className="flex-1"></div>
+          <input ref={uploadInputRef} type="file" accept=".csv,.xlsx" multiple className="hidden" onChange={handleUploadFile} />
+          <Tooltip text="支持文件格式：xlsx、csv，文件第一行为标题，单个最大50M" position="bottom">
+            <button onClick={() => uploadInputRef.current?.click()} className="px-5 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg shadow-sm transition-colors flex items-center gap-1.5">
+              <FileSpreadsheet size={14} /> 上传数据集
+            </button>
+          </Tooltip>
         </div>
 
         <div className="px-6 border-b border-gray-100 flex gap-6 text-sm">
@@ -1750,7 +1779,7 @@ const DatasetRecallCard = ({ msg, onConfirm, onOpenDatasetModal }) => {
 };
 
 // --- HomeView：集成多轮对话流引擎 ---
-const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, suggestionsMap, setIsNavCollapsed, setIsChatCollapsed }) => {
+const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, onGenTypeChange, onChattingChange, suggestionsMap, setIsNavCollapsed, setIsChatCollapsed }) => {
   const [inputText, setInputText] = useState('');
   const [activeFiles, setActiveFiles] = useState([]);
   const [messages, setMessages] = useState([]);
@@ -1854,11 +1883,11 @@ const HomeView = ({ onNavigate, favoriteReports, setFavoriteReports, agentInfo, 
   const [boardListTag, setBoardListTag] = useState('全部');
 
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
   const inputRef = useRef(null);
   const modelDropdownRef = useRef(null);
   const codeScrollRef = useRef(null);
   const previewIframeRef = useRef(null);
+  const chatFileInputRef = useRef(null);
   const leftChatRef = useRef(null);
   const recallAddCallbackRef = useRef(null);
 
@@ -2355,19 +2384,18 @@ ${messages.map(msg => {
     setActiveFiles(activeFiles.filter((_, index) => index !== indexToRemove));
   };
 
+  const handleChatFileUpload = (event) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files).map(file => ({ name: file.name, size: (file.size / 1024).toFixed(2) + 'k', type: file.name.split('.').pop()?.toLowerCase() }));
+    setActiveFiles([...activeFiles, ...newFiles.filter(nf => !activeFiles.some(cf => cf.name === nf.name))]);
+    if (chatFileInputRef.current) chatFileInputRef.current.value = '';
+  };
+
   const handleDatasetConfirm = (selectedDatasets) => {
     const newFiles = selectedDatasets.map(ds => ({ name: ds.name, size: 'Unknown' }));
     setActiveFiles([...activeFiles, ...newFiles.filter(nf => !activeFiles.some(cf => cf.name === nf.name))]);
     setShowDatasetModal(false);
-  };
-
-  const handleFileUpload = (event) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const newFiles = Array.from(files).map(file => ({ name: file.name, size: (file.size / 1024).toFixed(2) + 'k' }));
-      setActiveFiles([...activeFiles, ...newFiles.filter(nf => !activeFiles.some(cf => cf.name === nf.name))]);
-    }
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   // 用户在 dataset_recall 确认后触发 HTML 生成
@@ -2971,9 +2999,10 @@ ${messages.map(msg => {
               )}
             </div>
           )}
-          <Tooltip text="上传数据文件">
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
-              <FileSpreadsheet size={14} />
+          <input ref={chatFileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.gif,.bmp,.xlsx,.csv,.xls,.doc,.docx" multiple className="hidden" onChange={handleChatFileUpload} />
+          <Tooltip text="上传文件（支持PDF、图片、Excel、CSV、Word）">
+            <button onClick={() => chatFileInputRef.current?.click()} className="flex items-center justify-center text-xs font-medium text-gray-600 hover:text-green-600 bg-gray-50 hover:bg-green-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-green-200 transition-colors shadow-sm">
+              <Paperclip size={14} />
             </button>
           </Tooltip>
           {generationType === 'explore' && (
@@ -3376,6 +3405,7 @@ ${messages.map(msg => {
   };
 
   const isChatting = messages.length > 0;
+  useEffect(() => { onChattingChange?.(isChatting); }, [isChatting]);
   const isHtmlWorkspace = generationType === 'html' && Boolean(latestHtmlMsg);
   const isBoardWorkspace = generationType === 'board' && (boardDashboardVisible || boardStreamingMsgId);
 
@@ -3520,7 +3550,6 @@ ${messages.map(msg => {
   return (
     <div className={`flex h-full justify-center overflow-hidden transition-colors duration-500 ${isChatting ? 'bg-[#f4f6f8]' : 'bg-white'}`}>
       <style>{styles}</style>
-      <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xlsx,.xls" multiple onChange={handleFileUpload} />
       {showDatasetModal && <DatasetSelectionModal onClose={() => { setShowDatasetModal(false); recallAddCallbackRef.current = null; }} onConfirm={(selectedDs) => { if (recallAddCallbackRef.current) { recallAddCallbackRef.current(selectedDs); recallAddCallbackRef.current = null; } else { handleDatasetConfirm(selectedDs); } setShowDatasetModal(false); }} />}
 
       {/* 创建智能看板弹窗 */}
@@ -5129,6 +5158,7 @@ export default function App() {
   const [homeViewKey, setHomeViewKey] = useState(0);
   const [agentViewKey, setAgentViewKey] = useState(0);
   const [activeGenType, setActiveGenType] = useState('qa');
+  const [isHomeChatting, setIsHomeChatting] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showQrCodeModal, setShowQrCodeModal] = useState(false);
@@ -5307,6 +5337,7 @@ export default function App() {
   const goHome = () => {
     setCurrentView('home');
     setHomeViewKey(prev => prev + 1);
+    setIsHomeChatting(false);
   };
 
   const newChat = () => {
@@ -5326,7 +5357,9 @@ export default function App() {
   const buildBreadcrumbs = () => {
     const crumbs = [{ label: '首页', action: goHome }];
     if (currentView === 'home') {
-      // 首页不显示子标签，只保留"首页"
+      if (isHomeChatting) {
+        crumbs.push({ label: genTypeLabel[activeGenType] || '智能问数' });
+      }
     } else if (currentView === 'agent-manage') {
       crumbs.push({ label: 'BI智能体' });
       crumbs.push({ label: '智能体管理' });
@@ -5461,7 +5494,7 @@ export default function App() {
             <button onClick={() => setShowQrCodeModal(true)} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><QrCode size={16} /><span className="hidden sm:inline">小程序体验</span></button>
           </div>
         </div>
-        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} setIsNavCollapsed={setIsNavCollapsed} setIsChatCollapsed={setIsChatCollapsed} />}
+        {currentView === 'home' && <HomeView key={homeViewKey} onNavigate={setCurrentView} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} onGenTypeChange={setActiveGenType} onChattingChange={setIsHomeChatting} suggestionsMap={suggestionsMap} setIsNavCollapsed={setIsNavCollapsed} setIsChatCollapsed={setIsChatCollapsed} />}
         {currentView === 'agent-manage' && <AgentManageView onNavigate={setCurrentView} />}
         {currentView === 'agents' && <AgentsView onNavigate={setCurrentView} />}
         {currentView === 'chat-agent-1' && <ChatAgentView key={agentViewKey} onBack={goHome} favoriteReports={favoriteReports} setFavoriteReports={setFavoriteReports} agentInfo={agentManageData.find(a => a.id === 1)} onNavigate={setCurrentView} onGenTypeChange={setActiveGenType} suggestionsMap={suggestionsMap} setIsNavCollapsed={setIsNavCollapsed} setIsChatCollapsed={setIsChatCollapsed} />}
