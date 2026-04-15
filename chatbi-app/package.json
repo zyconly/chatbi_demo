@@ -13,7 +13,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "docx": "^9.6.1",
     "file-saver": "^2.0.5",
+    "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.576.0",
     "react": "^19.2.0",

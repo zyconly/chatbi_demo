@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/chatbi_demo/',
+  base: '/',
   server: {
+    host: '0.0.0.0',
+    port: 3000,
     proxy: {
       '/api/serpapi': {
         target: 'https://serpapi.com',

@@ -4,6 +4,9 @@
 .venv/
 node_modules/
 dist/
+.vite/
+.codex/
+test.html
 *.log
 .env
 .env.*
